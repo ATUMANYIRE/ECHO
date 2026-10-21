@@ -6,7 +6,7 @@ import { CodeEditorPane } from "../components/workspace/CodeEditorPane";
 import { ExpectedBehaviorPane } from "../components/workspace/ExpectedBehaviorPane";
 import { ControlBar } from "../components/workspace/ControlBar";
 import { ExecutionTimelinePane } from "../components/workspace/ExecutionTimelinePane";
-import { SAMPLE_TRACE } from "../lib/sample-data";
+import { ExecutionResponse } from "../lib/types";
 
 describe("Workspace Components", () => {
   it("WorkspaceHeader displays title, tagline, and health state", () => {
@@ -20,8 +20,8 @@ describe("Workspace Components", () => {
           uptime_seconds: 10,
           timestamp: new Date().toISOString(),
           sandbox_available: true,
-          execution_enabled: false,
-          milestone: "Milestone 1",
+          execution_enabled: true,
+          milestone: "Milestone 2",
         }}
         isLoadingHealth={false}
         healthError={null}
@@ -31,6 +31,7 @@ describe("Workspace Components", () => {
     expect(screen.getByText("ECHO")).toBeInTheDocument();
     expect(screen.getByText("GLITCHATHON 2026")).toBeInTheDocument();
     expect(screen.getByText(/API Online/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sandbox: Active/i)).toBeInTheDocument();
   });
 
   it("CodeEditorPane renders code lines and reacts to input changes", () => {
@@ -66,34 +67,89 @@ describe("Workspace Components", () => {
     expect(handleChange).toHaveBeenCalledWith("Updated expectation");
   });
 
-  it("ControlBar has disabled action buttons with Milestone 2 badge", () => {
-    render(<ControlBar />);
+  it("ControlBar has enabled Run button in Milestone 2", () => {
+    const handleRun = vi.fn();
+    render(
+      <ControlBar
+        onRun={handleRun}
+        isRunning={false}
+        canRun={true}
+      />
+    );
 
     const runBtn = screen.getByTestId("run-code-button");
     const investigateBtn = screen.getByTestId("investigate-button");
 
-    expect(runBtn).toBeDisabled();
+    expect(runBtn).toBeEnabled();
     expect(investigateBtn).toBeDisabled();
-    expect(screen.getByText("Milestone 1 Preview")).toBeInTheDocument();
+    expect(screen.getByText("Isolated Sandbox Active")).toBeInTheDocument();
+
+    fireEvent.click(runBtn);
+    expect(handleRun).toHaveBeenCalledTimes(1);
   });
 
-  it("ExecutionTimelinePane explicitly displays the illustrative preview badge and scrubs steps", () => {
+  it("ExecutionTimelinePane displays authoritative trace and allows stepping", () => {
     const handleSelectStep = vi.fn();
+    const mockExecution: ExecutionResponse = {
+      execution_id: "exec-test-1",
+      status: "completed",
+      total_steps: 2,
+      duration_ms: 12.0,
+      stdout: "output test",
+      stderr: "",
+      is_authoritative: true,
+      executed_at: new Date().toISOString(),
+      steps: [
+        {
+          step_index: 0,
+          line_number: 1,
+          event_type: "line",
+          function_name: "<module>",
+          locals_snapshot: {
+            x: { name: "x", type_name: "int", repr_value: "10", is_changed: true },
+          },
+          stdout_delta: "",
+          exception: null,
+        },
+        {
+          step_index: 1,
+          line_number: 2,
+          event_type: "line",
+          function_name: "<module>",
+          locals_snapshot: {
+            x: { name: "x", type_name: "int", repr_value: "10", is_changed: false },
+            y: { name: "y", type_name: "int", repr_value: "20", is_changed: true },
+          },
+          stdout_delta: "",
+          exception: null,
+        },
+      ],
+    };
+
     render(
       <ExecutionTimelinePane
-        traceData={SAMPLE_TRACE}
+        realExecution={mockExecution}
+        sampleTrace={null}
+        isSampleMode={false}
+        isLoading={false}
         activeStepIndex={0}
         onSelectStep={handleSelectStep}
+        onSwitchToReal={() => {}}
       />
     );
 
-    // Verifies illustrative badge is visible to prevent misleading users
-    expect(screen.getByTestId("illustrative-trace-badge")).toBeInTheDocument();
-    expect(screen.getByText(/Illustrative Preview Only/i)).toBeInTheDocument();
+    // Verify authoritative badge
+    expect(screen.getByTestId("authoritative-trace-badge")).toBeInTheDocument();
+    expect(screen.getByText(/Verified Container Trace/i)).toBeInTheDocument();
 
-    // Verify next button triggers step change
+    // Verify next step button
     const nextBtn = screen.getByTestId("step-next-button");
     fireEvent.click(nextBtn);
     expect(handleSelectStep).toHaveBeenCalledWith(1);
+
+    // Verify terminal output tab
+    const outputTab = screen.getByTestId("output-tab-button");
+    fireEvent.click(outputTab);
+    expect(screen.getByText("output test")).toBeInTheDocument();
   });
 });

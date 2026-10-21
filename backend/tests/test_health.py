@@ -11,15 +11,15 @@ async def test_health_endpoint_api_path(async_client: AsyncClient):
     assert response.status_code == 200
 
     data = response.json()
-    assert data["status"] == "healthy"
+    assert data["status"] in ("healthy", "degraded")
     assert data["app"] == "ECHO API"
     assert "version" in data
     assert "uptime_seconds" in data
     assert data["uptime_seconds"] >= 0.0
     assert "sandbox_available" in data
     assert isinstance(data["sandbox_available"], bool)
-    assert data["execution_enabled"] is False  # Milestone 1 guarantee
-    assert data["milestone"] == "Milestone 1: Production-Quality Foundation"
+    assert data["execution_enabled"] is True  # Milestone 2 active
+    assert "Milestone 2" in data["milestone"]
     assert "message" in data
 
 
@@ -29,7 +29,7 @@ async def test_health_endpoint_root_path(async_client: AsyncClient):
     response = await async_client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "healthy"
+    assert data["status"] in ("healthy", "degraded")
 
 
 @pytest.mark.asyncio

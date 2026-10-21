@@ -1,11 +1,11 @@
-# ECHO Full Foundation Test Runner
-Write-Host "=== Running ECHO Milestone 1 Foundation Tests ===" -ForegroundColor Cyan
+# ECHO Full Foundation & Milestone 2 Test Runner
+Write-Host "=== Running ECHO Milestone 2 Automated Test Suites ===" -ForegroundColor Cyan
 
-Write-Host "`n[1/3] Running Backend Tests (pytest)..." -ForegroundColor Yellow
+Write-Host "`n[1/3] Running Backend Tests (pytest with isolated Docker sandbox)..." -ForegroundColor Yellow
 if (Test-Path ".\backend\venv\Scripts\pytest.exe") {
-    & ".\backend\venv\Scripts\pytest.exe" backend\tests
+    & ".\backend\venv\Scripts\pytest.exe" backend\tests -v
 } else {
-    pytest backend\tests
+    pytest backend\tests -v
 }
 
 if ($LASTEXITCODE -ne 0) {
@@ -29,4 +29,4 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "`n=== All Milestone 1 Foundation Tests Passed Successfully! ===" -ForegroundColor Green
+Write-Host "`n=== All ECHO Milestone 2 Tests Passed Successfully! ===" -ForegroundColor Green

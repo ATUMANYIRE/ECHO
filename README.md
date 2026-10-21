@@ -2,7 +2,7 @@
 
 > **Tagline:** *Don't just fix the mistake. Understand the moment it was made.*  
 > **GLITCHATHON 2026 Submission** | Target Deadline: October 25, 2026, 13:30 GMT+2  
-> **Current Status:** Milestone 1 Complete (Production-Quality Foundation)
+> **Current Status:** Milestone 2 Complete (Secure Execution & Real-Time Code Tracing)
 
 ---
 
@@ -13,26 +13,23 @@ ECHO helps computer science students understand **why** and **when** their code 
 > **Execution evidence is authoritative. AI explanations are hypotheses until supported by evidence.**
 
 When a student submits code:
-1. Untrusted code executes inside an isolated, disposable container environment (Milestone 2).
-2. Authoritative execution events and local variable mutations are captured step-by-step.
-3. Students navigate an interactive execution timeline to scrub back and forth across every state change.
+1. Untrusted code executes inside an isolated, disposable Docker container (`echo-runner`).
+2. Authoritative execution events and local variable mutations are captured step-by-step using `sys.settrace`.
+3. Students navigate an interactive execution timeline to scrub across state mutations and line executions.
 4. AI analyzes the divergence between the student's expected outcome and the authoritative trace to explain the root misconception without hallucinations (Milestone 4).
 5. Targeted comprehension micro-quizzes verify student understanding (Milestone 5).
 
 ---
 
-## 2. Milestone 1 Scope & Status
+## 2. Milestone 2 Scope & Status
 
-Milestone 1 establishes the production-grade engineering foundation:
-- **Repository Architecture:** Monorepo with typed FastAPI backend and Next.js frontend.
-- **Backend Service:** FastAPI with Pydantic v2 settings, CORS, and `/api/health` system readiness probes.
-- **Frontend Workspace:** Modern, light-first workbench (warm-white palette, zero gratuitous scroll, responsive 2-column layout).
-- **Code Editor:** Python editor with line number gutter, character counters, and active execution line highlights.
-- **Intent Card:** Structured input for student expectations.
-- **Execution Timeline:** Step scrubber and variable state diff viewer displaying an explicitly marked **illustrative sample trace** (off-by-one boundary demo) without falsely claiming live execution.
-- **Execution Controls:** Run and Investigate buttons cleanly labeled with Milestone 2 & Milestone 4 badges.
-- **Docker Compose:** Production containerization definitions and isolated runner specifications.
-- **Full Test Harness:** 100% passing Pytest suite, Vitest component suite, and TypeScript strict checks.
+Milestone 2 activates genuine, secure code execution and tracing:
+- **Disposable Container Runner:** Ephemeral Docker runner (`echo-runner:latest`) running non-root (`10001:10001`), network disabled (`--network none`), read-only rootfs, `noexec` tmpfs, CPU/memory limits, and hard execution timeouts.
+- **Authoritative Trace Recorder:** Real-time line events, call/return frames, runtime exceptions, stdout deltas, and local variable diffs (`is_changed`).
+- **Activated API:** `POST /api/execution/run` accepts Python source code and returns verified execution traces.
+- **Live Frontend Integration:** Code editor and "Run in Sandbox" button execute real student code; execution timeline updates with genuine traces; Terminal Output panel displays stdout/stderr/durations.
+- **Fail-Safe Policy:** If Docker is unavailable, the API explicitly refuses execution (`sandbox_unavailable`) rather than executing untrusted code on the host.
+- **Full Test Harness:** 41 passing automated tests across backend (`pytest`), frontend unit (`vitest`), and Playwright browser E2E suites.
 
 ---
 
@@ -100,7 +97,7 @@ cd E:\Projects\ECHO
 Or run suites independently:
 
 ```powershell
-# 1. Backend Pytest Suite
+# 1. Backend Pytest Suite (including Docker sandbox tests)
 backend\venv\Scripts\pytest backend\tests -v
 
 # 2. Frontend Vitest Suite
@@ -109,8 +106,11 @@ npm test --prefix frontend
 # 3. TypeScript Strict Type-Check
 npm run type-check --prefix frontend
 
-# 4. Production Build Verification
-npm run build --prefix frontend
+# 4. Playwright Browser E2E Suite
+cd frontend; npx playwright test
+
+# 5. Live Acceptance Demonstration Script
+backend\venv\Scripts\python scripts\acceptance-demo.py
 ```
 
 ---

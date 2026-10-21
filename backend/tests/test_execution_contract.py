@@ -1,21 +1,25 @@
-"""Tests for execution API contract and Milestone 1 boundary."""
+"""Tests for execution API contract and validation."""
 
 import pytest
 from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_execution_endpoint_not_implemented_in_milestone_1(async_client: AsyncClient):
-    """Execution endpoint must return 501 Not Implemented in Milestone 1."""
+async def test_execution_endpoint_returns_typed_response(async_client: AsyncClient):
+    """Execution endpoint returns a valid ExecutionResponse schema."""
     payload = {
-        "code": "def find_max(numbers):\n    return max(numbers)",
-        "expected_behavior": "Should return maximum number in list",
+        "code": "result = 40 + 2\nprint(result)",
+        "expected_behavior": "Should calculate 42",
     }
     response = await async_client.post("/api/execution/run", json=payload)
-    assert response.status_code == 501
+    assert response.status_code == 200
     data = response.json()
-    assert "Milestone 1" in data["detail"]
-    assert "Milestone 2" in data["detail"]
+    assert "status" in data
+    assert "execution_id" in data
+    assert "steps" in data
+    assert "stdout" in data
+    assert "duration_ms" in data
+    assert data["is_authoritative"] is True
 
 
 @pytest.mark.asyncio

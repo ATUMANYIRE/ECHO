@@ -60,34 +60,50 @@ export async function getBackendHealth(): Promise<HealthResponse> {
 }
 
 /**
- * Submits Python code for isolated execution.
- * NOTE: In Milestone 1, this returns 501 Not Implemented from the backend.
+ * Submits Python code to the isolated Docker sandbox runner.
+ * Returns authoritative execution trace events and variable mutations.
  */
 export async function executeCode(request: ExecutionRequest): Promise<ExecutionResponse> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}/api/execution/run`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(request),
-  });
+  const controller = new AbortController();
+  // 10s client timeout to accommodate container creation & execution
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  if (!response.ok) {
-    let errorDetail = `Execution request failed (${response.status})`;
-    try {
-      const body = await response.json();
-      if (body && typeof body.detail === "string") {
-        errorDetail = body.detail;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorDetail = `Execution request failed (${response.status})`;
+      try {
+        const body = await response.json();
+        if (body && typeof body.detail === "string") {
+          errorDetail = body.detail;
+        } else if (body && typeof body.error_message === "string") {
+          errorDetail = body.error_message;
+        }
+      } catch {
+        // ignore json parse error
       }
-    } catch {
-      // ignore json parse error
+      throw new ApiError(errorDetail, response.status);
     }
-    throw new ApiError(errorDetail, response.status);
-  }
 
-  return response.json();
+    return await response.json();
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof ApiError) throw err;
+    const msg = err instanceof Error ? err.message : "Network error executing code";
+    throw new ApiError(`Execution request failed: ${msg}`, 0);
+  }
 }

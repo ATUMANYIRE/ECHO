@@ -33,9 +33,11 @@ class Settings(BaseSettings):
     gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
 
     # Execution Sandbox Settings (Milestone 2)
-    execution_timeout_seconds: float = Field(default=3.0, alias="EXECUTION_TIMEOUT_SECONDS")
+    runner_image: str = Field(default="echo-runner:latest", alias="RUNNER_IMAGE")
+    execution_timeout_seconds: float = Field(default=5.0, alias="EXECUTION_TIMEOUT_SECONDS")
     execution_max_memory_mb: int = Field(default=128, alias="EXECUTION_MAX_MEMORY_MB")
     execution_max_steps: int = Field(default=500, alias="EXECUTION_MAX_STEPS")
+    max_concurrent_executions: int = Field(default=5, alias="MAX_CONCURRENT_EXECUTIONS")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

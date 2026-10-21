@@ -22,7 +22,7 @@ export type ExecutionStatus =
   | "error"
   | "trace_limit_exceeded"
   | "sandbox_unavailable"
-  | "not_implemented";
+  | "oom_killed";
 
 export interface VariableSnapshot {
   name: string;
@@ -43,10 +43,11 @@ export interface TraceStep {
 
 export interface ExecutionRequest {
   code: string;
-  expected_behavior: string;
+  expected_behavior?: string;
 }
 
 export interface ExecutionResponse {
+  execution_id: string;
   status: ExecutionStatus;
   total_steps: number;
   duration_ms: number;
@@ -54,6 +55,10 @@ export interface ExecutionResponse {
   stderr: string;
   steps: TraceStep[];
   error_message?: string | null;
+  error_type?: string | null;
+  error_line?: number | null;
+  error_offset?: number | null;
+  termination_reason?: string | null;
   is_authoritative: boolean;
   executed_at: string;
 }

@@ -1,54 +1,52 @@
 # ECHO — Engineering Progress & Milestone Tracking
 
-## Current Status: Milestone 1 Complete
+## Current Status: Milestone 2 Complete
 - **Date Completed:** October 21, 2026
 - **Lead Architect:** Principal Full-Stack & Security Engineer
 - **Verdict:** PASS
 
 ---
 
-## Milestone 1 Implementation Checklist
+## Milestone 2 Implementation Checklist
 
-### 1. Repository & Documentation Foundations
-- [x] Create project `.gitignore` (Python, Node, Docker, secrets)
-- [x] Create `docs/ROADMAP.md` (5 milestone roadmap with measurable criteria)
-- [x] Create `docs/ARCHITECTURE.md` (System design & communication contracts)
-- [x] Create `docs/SECURITY.md` (Untrusted code execution model & sandbox spec)
-- [x] Create `docs/TESTING.md` (Automated verification strategy)
-- [x] Create `docs/PROGRESS.md` (Audit trail & progress ledger)
-- [x] Create `AGENTS.md` (Instructions & boundaries for autonomous agents)
-- [x] Create root `README.md` (Windows PowerShell commands & architecture overview)
+### 1. Isolated Execution Sandbox
+- [x] Create `backend/runner/Dockerfile` with non-root user `10001:10001`
+- [x] Create `backend/runner/trace_runner.py` with `sys.settrace` engine
+- [x] Build `echo-runner:latest` container image
+- [x] Configure Linux kernel isolation flags (`--network none`, `--read-only`, `--tmpfs /tmp:rw,noexec,nosuid,size=16m`, `--cpus 0.5`, `--memory 128m`, `--pids-limit 64`, `--cap-drop ALL`, `--security-opt no-new-privileges:true`)
+- [x] Implement asynchronous container orchestrator (`backend/app/services/sandbox.py`)
+- [x] Enforce hard execution timeout with container kill & teardown
+- [x] Ensure reliable container cleanup (`docker rm -f`) with zero container leaks
+- [x] Concurrency semaphore limiter to avoid Docker daemon exhaustion
+- [x] Fallback policy: refuse execution (`sandbox_unavailable`) when Docker is unreachable
 
-### 2. Backend Foundation (FastAPI)
-- [x] Initialize Python backend structure (`backend/app/...`)
-- [x] Implement configuration layer with `pydantic-settings` (`backend/app/config.py`)
-- [x] Implement `/api/health` and `/health` endpoints with uptime, Docker availability, and version (`backend/app/api/health.py`)
-- [x] Implement Pydantic execution request/response models for M2 contracts (`backend/app/schemas/execution.py`)
-- [x] Add Pytest suite for health endpoint, CORS, and schema verification (8 tests passing)
-- [x] Add backend `requirements.txt` / `requirements-dev.txt` and `.env.example`
-- [x] Configure backend on port 8005 avoiding collisions
-- [x] Backend Dockerfile (`backend/Dockerfile`)
+### 2. Authoritative Tracing Engine
+- [x] Monotonic step indexing and line number mapping
+- [x] Scope tracking (`<module>` vs functions)
+- [x] Local variable snapshots with safe truncation
+- [x] Variable delta tracking (`is_changed` diff)
+- [x] Exception event capturing and line location
+- [x] Standard output and error capturing (bounded at 64 KB)
+- [x] Max step bound (capped at 500 steps)
+- [x] Delimited JSON stream output (`<<<ECHO_TRACE_START>>>`)
 
-### 3. Frontend Foundation (Next.js & Tailwind CSS)
-- [x] Next.js 14+ application in TypeScript strict mode with Tailwind CSS
-- [x] Configured light-first color system (warm white canvas `#FAFAF8`, restrained indigo/violet accents)
-- [x] `WorkspaceShell` responsive grid layout (zero unnecessary desktop scroll)
-- [x] `CodeEditorPane` with syntax highlighting, line numbers, character counters, and active execution line tracking
-- [x] `ExpectedBehaviorPane` input component with guidance tooltips
-- [x] `ExecutionTimelinePane` with explicit **illustrative sample data only** warning and step scrubber
-- [x] `ControlBar` with Run / Investigate buttons marked as disabled with Milestone 2/4 badges
-- [x] Typed API client (`lib/api-client.ts`) communicating with `/api/health`
-- [x] Vitest & React Testing Library unit tests (8 tests passing)
-- [x] Frontend `.env.example` & `.env.local` configured for port 3005
-- [x] Frontend Dockerfile (`frontend/Dockerfile`)
+### 3. API Implementation
+- [x] Activate `POST /api/execution/run` returning `ExecutionResponse`
+- [x] Handle status states: `completed`, `error`, `timeout`, `trace_limit_exceeded`, `sandbox_unavailable`, `oom_killed`
+- [x] Update `/api/health` to reflect live runner readiness (`execution_enabled: true`)
 
-### 4. Docker & Containerization Foundation
-- [x] `backend/Dockerfile` with non-root security user and healthcheck
-- [x] `frontend/Dockerfile` multi-stage build
-- [x] Root `docker-compose.yml` linking frontend, backend, ports 3005:3000 & 8005:8000
+### 4. Frontend Integration
+- [x] Enable "Run in Sandbox" button with loading spinner
+- [x] Connect `WorkspaceShell` to real API
+- [x] Replace default illustrative preview with live authoritative trace steps
+- [x] Terminal Output panel for stdout / stderr / duration
+- [x] Syntax error state and runtime exception line highlighting
+- [x] Step-by-step navigation and variable delta badges
+- [x] Preset switcher for acceptance bug, corrected program, and sample demo
 
-### 5. Automated Verification & Acceptance
-- [x] Pytest suite: 8/8 tests passed
-- [x] Vitest suite: 8/8 tests passed
-- [x] TypeScript compiler: 0 errors under `strict: true`
-- [x] Next.js production build (`npm run build`): Compiled successfully
+### 5. Automated Verification
+- [x] Backend tests: 22/22 tests passing (pytest)
+- [x] Frontend unit tests: 9/9 tests passing (vitest)
+- [x] TypeScript strict type-check: 0 errors
+- [x] Playwright E2E browser tests: 10/10 tests passing
+- [x] Acceptance demonstration script (`scripts/acceptance-demo.py`): verified live output `33.333333333333336` and `80.0`

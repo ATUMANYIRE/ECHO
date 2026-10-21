@@ -1,14 +1,10 @@
-"""Pydantic schemas for execution requests, trace steps, and diagnostics.
-
-Establishes the typed contract between Frontend and Backend.
-NOTE: In Milestone 1, execution is disabled. These models formalize the API shape
-for Milestone 2 (Isolation & Tracing) and Milestone 4 (AI Root-Cause Diagnostics).
-"""
+"""Pydantic schemas for execution requests, trace steps, and diagnostics."""
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
+import uuid
 
 
 class ExecutionStatus(str, Enum):
@@ -17,7 +13,7 @@ class ExecutionStatus(str, Enum):
     ERROR = "error"
     TRACE_LIMIT_EXCEEDED = "trace_limit_exceeded"
     SANDBOX_UNAVAILABLE = "sandbox_unavailable"
-    NOT_IMPLEMENTED = "not_implemented"
+    OOM_KILLED = "oom_killed"
 
 
 class VariableSnapshot(BaseModel):
@@ -57,6 +53,7 @@ class ExecutionRequest(BaseModel):
 class ExecutionResponse(BaseModel):
     """Result of an isolated execution run."""
 
+    execution_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     status: ExecutionStatus
     total_steps: int = 0
     duration_ms: float = 0.0
@@ -64,8 +61,12 @@ class ExecutionResponse(BaseModel):
     stderr: str = ""
     steps: List[TraceStep] = Field(default_factory=list)
     error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    error_line: Optional[int] = None
+    error_offset: Optional[int] = None
+    termination_reason: Optional[str] = None
     is_authoritative: bool = Field(
         default=True,
         description="True if captured from real sandbox execution. False if simulated.",
     )
-    executed_at: datetime = Field(default_factory=datetime.utcnow)
+    executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

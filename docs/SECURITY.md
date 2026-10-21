@@ -78,10 +78,16 @@ If container isolation is unavailable (e.g. Docker daemon unreachable, container
 
 ---
 
-## 6. Milestone 1 Security Stance
+## 6. Milestone 2 Security Implementation & Verification
 
-In Milestone 1:
-- Code execution is **fully disabled** by design.
-- The UI controls are visibly marked with informative badges indicating the execution engine status.
-- The health endpoint (`/api/health`) inspects Docker readiness honestly and returns `sandbox_ready: false` (or `true` if Docker daemon is detected, with `execution_enabled: false` for M1).
-- No simulated execution is passed off as real execution.
+In Milestone 2:
+- Code execution is **active** exclusively inside disposable Linux containers using `echo-runner:latest`.
+- The following isolation constraints have been verified through automated integration tests:
+  1. **Network Denial:** Outbound network connection attempts (`socket.create_connection`) are verified to fail with `OSError: [Errno 101] Network is unreachable`.
+  2. **Filesystem Protection:** Attempts to write to `/root` or any non-tmpfs path fail with `PermissionError: [Errno 13] Permission denied`.
+  3. **No-Exec Tmpfs:** Memory-backed `/tmp` is mounted with `noexec,nosuid`, preventing execution of binaries dropped into `/tmp`.
+  4. **Timeout Enforcement:** Infinite loops (`while True: pass`) are killed and removed within the configured timeout.
+  5. **Output Bounding:** Output streams are bounded to 64 KB maximum.
+  6. **Step Bounding:** Step traces are capped at 500 steps (`trace_limit_exceeded`).
+  7. **Container Teardown:** Every container is named uniquely (`echo-run-*`) and destroyed upon completion (`docker rm -f`), leaving 0 orphaned containers.
+  8. **Fallback Safety:** If Docker daemon is unavailable, the API safely refuses execution (`sandbox_unavailable`) rather than executing untrusted code on the host.

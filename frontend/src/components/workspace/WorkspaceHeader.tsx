@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Activity, ShieldCheck, Cpu } from "lucide-react";
+import { Activity, ShieldCheck, AlertTriangle } from "lucide-react";
 import { HealthResponse } from "@/lib/types";
 
 interface WorkspaceHeaderProps {
@@ -15,6 +15,8 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
   isLoadingHealth,
   healthError,
 }) => {
+  const isSandboxReady = health?.sandbox_available && health?.execution_enabled;
+
   return (
     <header className="border-b border-zinc-200/80 bg-white/90 backdrop-blur-sm px-4 lg:px-6 py-2.5 flex items-center justify-between sticky top-0 z-20">
       <div className="flex items-center gap-3">
@@ -30,8 +32,8 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
               <span className="text-[10px] font-medium tracking-wide uppercase px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200/60">
                 GLITCHATHON 2026
               </span>
-              <span className="hidden sm:inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
-                Milestone 1: Foundation
+              <span className="hidden sm:inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Milestone 2: Secure Tracing
               </span>
             </div>
             <p className="text-[11px] text-zinc-500 hidden md:block">
@@ -56,7 +58,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             healthError
               ? `Backend unreachable: ${healthError}`
               : health
-              ? `Backend v${health.version} (${health.environment}) — Sandbox: ${health.sandbox_available ? "Docker Ready" : "Host Only"}`
+              ? `Backend v${health.version} (${health.environment}) — Sandbox: ${isSandboxReady ? "Docker Active" : "Unavailable"}`
               : "Checking backend health..."
           }
         >
@@ -82,11 +84,28 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
         {/* Sandbox status indicator */}
         <div
           data-testid="sandbox-status-chip"
-          className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-100 text-zinc-600 border border-zinc-200 text-[11px]"
-          title="Sandbox isolation active in Milestone 2. Code execution is currently restricted."
+          className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-medium ${
+            isSandboxReady
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-amber-50 text-amber-700 border-amber-200"
+          }`}
+          title={
+            isSandboxReady
+              ? "Disposable Docker execution container ready"
+              : "Docker sandbox unavailable"
+          }
         >
-          <ShieldCheck className="w-3 h-3 text-zinc-500" />
-          <span>Sandbox: Guarded (M1)</span>
+          {isSandboxReady ? (
+            <>
+              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+              <span>Sandbox: Active</span>
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="w-3 h-3 text-amber-600" />
+              <span>Sandbox: Offline</span>
+            </>
+          )}
         </div>
       </div>
     </header>
