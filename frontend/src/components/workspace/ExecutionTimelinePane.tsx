@@ -3,20 +3,29 @@
 import React, { useState } from "react";
 import {
   Clock,
-  ChevronLeft,
-  ChevronRight,
-  AlertOctagon,
-  Layers,
-  Sparkles,
-  Info,
-  CheckCircle2,
+  GitCommit,
+  GitCompare,
+  HelpCircle,
   Terminal,
   ShieldCheck,
+  Info,
+  AlertOctagon,
   AlertTriangle,
   Loader2,
-  HelpCircle,
+  Layers,
 } from "lucide-react";
-import { TraceStep, ExecutionResponse, SampleTraceData } from "@/lib/types";
+import {
+  TraceStep,
+  ExecutionResponse,
+  SampleTraceData,
+  ExecutionRunRecord,
+} from "@/lib/types";
+import { ReplayControls } from "./ReplayControls";
+import { VariableEvolutionCard } from "./VariableEvolutionCard";
+import { ComparisonView } from "./ComparisonView";
+import { PredictionChallengeCard } from "./PredictionChallengeCard";
+import { CallStackView } from "./CallStackView";
+import { generatePredictionChallenges } from "@/lib/timeline-analysis";
 
 interface ExecutionTimelinePaneProps {
   realExecution: ExecutionResponse | null;
@@ -26,7 +35,12 @@ interface ExecutionTimelinePaneProps {
   activeStepIndex: number;
   onSelectStep: (index: number) => void;
   onSwitchToReal: () => void;
+  runA?: ExecutionRunRecord | null;
+  runB?: ExecutionRunRecord | null;
+  onSelectRun?: (run: ExecutionRunRecord) => void;
 }
+
+export type TimelineTab = "timeline" | "evolution" | "compare" | "predict" | "output";
 
 export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
   realExecution,
@@ -36,8 +50,11 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
   activeStepIndex,
   onSelectStep,
   onSwitchToReal,
+  runA = null,
+  runB = null,
+  onSelectRun,
 }) => {
-  const [activeTab, setActiveTab] = useState<"timeline" | "output">("timeline");
+  const [activeTab, setActiveTab] = useState<TimelineTab>("timeline");
 
   // Determine current steps and metadata
   const steps: TraceStep[] = isSampleMode
@@ -48,50 +65,41 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
   const totalSteps = steps.length;
   const isAuthoritative = !isSampleMode && !!realExecution?.is_authoritative;
 
-  const canGoPrevious = activeStepIndex > 0;
-  const canGoNext = activeStepIndex < totalSteps - 1;
-
-  const handlePrevious = () => {
-    if (canGoPrevious) onSelectStep(activeStepIndex - 1);
-  };
-
-  const handleNext = () => {
-    if (canGoNext) onSelectStep(activeStepIndex + 1);
-  };
-
-  const handleJumpToException = () => {
-    const excIndex = steps.findIndex((s) => s.event_type === "exception");
-    if (excIndex !== -1) {
-      onSelectStep(excIndex);
-    }
-  };
+  // Find exception step if present
+  const excStepIndex = steps.findIndex((s) => s.event_type === "exception");
+  const hasException = excStepIndex !== -1;
 
   // Status flags
   const status = realExecution?.status;
   const isTimeout = status === "timeout";
   const isSyntaxError = status === "error" && realExecution?.error_type === "SyntaxError";
-  const isRuntimeError = status === "error" && !isSyntaxError;
-  const isSandboxUnavailable = status === "sandbox_unavailable";
   const isTraceLimitExceeded = status === "trace_limit_exceeded";
+  const isSandboxUnavailable = status === "sandbox_unavailable";
   const isOomKilled = status === "oom_killed";
+
+  // Generate deterministic prediction challenges from trace
+  const challenges = realExecution
+    ? generatePredictionChallenges(realExecution)
+    : [];
 
   return (
     <div className="flex flex-col h-full bg-white rounded-lg border border-zinc-200/90 shadow-card overflow-hidden">
-      {/* Pane Header */}
-      <div className="flex items-center justify-between px-3.5 py-2 border-b border-zinc-200/80 bg-zinc-50/70 text-xs">
+      {/* Pane Header with Navigation Tabs */}
+      <div className="flex flex-wrap items-center justify-between px-3 py-2 border-b border-zinc-200/80 bg-zinc-50/70 text-xs gap-2">
         <div className="flex items-center gap-2 font-medium text-zinc-700">
           <Clock className="w-4 h-4 text-brand-600" />
-          <span>Execution Engine</span>
-          {totalSteps > 0 && (
+          <span className="font-semibold">Workbench</span>
+          {totalSteps > 0 && activeTab === "timeline" && (
             <span className="text-[10px] text-zinc-400 font-mono">
               Step {activeStepIndex + 1}/{totalSteps}
             </span>
           )}
         </div>
 
-        {/* Tab switch between Timeline & Terminal Output */}
-        <div className="flex items-center gap-1.5">
+        {/* Tab Controls */}
+        <div className="flex items-center gap-1 overflow-x-auto">
           <button
+            data-testid="tab-timeline-button"
             onClick={() => setActiveTab("timeline")}
             className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
               activeTab === "timeline"
@@ -99,8 +107,56 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
                 : "text-zinc-600 hover:bg-zinc-100"
             }`}
           >
-            Trace Steps
+            Trace
           </button>
+
+          <button
+            data-testid="tab-evolution-button"
+            onClick={() => setActiveTab("evolution")}
+            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
+              activeTab === "evolution"
+                ? "bg-brand-50 text-brand-700 border border-brand-200"
+                : "text-zinc-600 hover:bg-zinc-100"
+            }`}
+          >
+            <GitCommit className="w-3 h-3" />
+            <span>Evolution</span>
+          </button>
+
+          <button
+            data-testid="tab-compare-button"
+            onClick={() => setActiveTab("compare")}
+            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
+              activeTab === "compare"
+                ? "bg-brand-50 text-brand-700 border border-brand-200"
+                : "text-zinc-600 hover:bg-zinc-100"
+            }`}
+          >
+            <GitCompare className="w-3 h-3" />
+            <span>Compare</span>
+            {runA && runB && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            )}
+          </button>
+
+          <button
+            data-testid="tab-predict-button"
+            onClick={() => setActiveTab("predict")}
+            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
+              activeTab === "predict"
+                ? "bg-brand-50 text-brand-700 border border-brand-200"
+                : "text-zinc-600 hover:bg-zinc-100"
+            }`}
+          >
+            <HelpCircle className="w-3 h-3" />
+            <span>Predict</span>
+            {challenges.length > 0 && (
+              <span className="text-[9px] bg-brand-200 text-brand-800 px-1 rounded-full font-bold">
+                {challenges.length}
+              </span>
+            )}
+          </button>
+
           <button
             data-testid="output-tab-button"
             onClick={() => setActiveTab("output")}
@@ -116,31 +172,31 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             )}
           </button>
-
-          {/* Mode Badge */}
-          {isAuthoritative ? (
-            <div
-              data-testid="authoritative-trace-badge"
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-medium ml-1"
-              title="Authoritative trace captured from isolated Docker container execution."
-            >
-              <ShieldCheck className="w-3 h-3 text-emerald-600" />
-              <span>Verified Container Trace</span>
-            </div>
-          ) : (
-            <div
-              data-testid="illustrative-trace-badge"
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 text-[10px] font-medium ml-1"
-              title="This trace is illustrative demonstration data."
-            >
-              <Info className="w-3 h-3 text-amber-600" />
-              <span>Sample Demo</span>
-            </div>
-          )}
         </div>
+
+        {/* Verification Status Chip */}
+        {isAuthoritative ? (
+          <div
+            data-testid="authoritative-trace-badge"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-medium"
+            title="Authoritative trace captured from isolated Docker container execution."
+          >
+            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+            <span>Verified Container Trace</span>
+          </div>
+        ) : (
+          <div
+            data-testid="illustrative-trace-badge"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 text-[10px] font-medium"
+            title="This trace is illustrative demonstration data."
+          >
+            <Info className="w-3 h-3 text-amber-600" />
+            <span>Sample Demo</span>
+          </div>
+        )}
       </div>
 
-      {/* Loading Overlay */}
+      {/* Main Tab Body */}
       {isLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#FCFCFA]">
           <Loader2 className="w-8 h-8 animate-spin text-brand-600 mb-3" />
@@ -148,11 +204,38 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
             Running in isolated sandbox...
           </h4>
           <p className="text-xs text-zinc-500 mt-1 max-w-xs leading-relaxed">
-            Executing code inside disposable Docker container with sys.settrace step recording.
+            Executing code inside disposable Docker container with sys.settrace recording.
           </p>
         </div>
+      ) : activeTab === "evolution" ? (
+        <VariableEvolutionCard
+          steps={steps}
+          currentStepIndex={activeStepIndex}
+          onJumpToStep={(idx) => {
+            onSelectStep(idx);
+            setActiveTab("timeline");
+          }}
+          comparisonSteps={runB?.response.steps}
+        />
+      ) : activeTab === "compare" ? (
+        <ComparisonView
+          runA={runA}
+          runB={runB}
+          onSelectRun={(run) => {
+            onSelectRun?.(run);
+            setActiveTab("timeline");
+          }}
+        />
+      ) : activeTab === "predict" ? (
+        <PredictionChallengeCard
+          challenges={challenges}
+          onJumpToStep={(idx) => {
+            onSelectStep(idx);
+            setActiveTab("timeline");
+          }}
+        />
       ) : activeTab === "output" ? (
-        /* Standard Output Panel */
+        /* Terminal Output Tab */
         <div className="flex-1 flex flex-col bg-[#18181B] text-zinc-200 font-mono text-xs overflow-hidden">
           <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-900 border-b border-zinc-800 text-[11px] text-zinc-400">
             <span>Standard Output / Error</span>
@@ -197,14 +280,14 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
           </div>
         </div>
       ) : (
-        /* Timeline View */
+        /* Main Timeline Trace View */
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Status Banners */}
+          {/* Status Alerts */}
           {isTimeout && (
             <div className="px-3.5 py-2 bg-rose-50 border-b border-rose-200 text-xs text-rose-900 flex items-center gap-2">
               <AlertOctagon className="w-4 h-4 text-rose-600 flex-shrink-0" />
               <span>
-                <strong>Execution Timed Out:</strong> Program exceeded execution timeout. Check for infinite loops.
+                <strong>Execution Timed Out:</strong> Process exceeded timeout limit. Check for infinite loops.
               </span>
             </div>
           )}
@@ -213,7 +296,7 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
             <div className="px-3.5 py-2 bg-rose-50 border-b border-rose-200 text-xs text-rose-900 flex items-center gap-2">
               <AlertOctagon className="w-4 h-4 text-rose-600 flex-shrink-0" />
               <span>
-                <strong>Out of Memory:</strong> Container was terminated because it exceeded the 128 MB RAM limit.
+                <strong>Out of Memory:</strong> Container exceeded the 128 MB RAM limit.
               </span>
             </div>
           )}
@@ -222,7 +305,7 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
             <div className="px-3.5 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
               <span>
-                <strong>Trace Limit Reached:</strong> Stopped after 500 execution events to protect memory bounds.
+                <strong>Trace Limit Reached:</strong> Truncated at 500 execution events to protect memory bounds.
               </span>
             </div>
           )}
@@ -236,94 +319,28 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
             </div>
           )}
 
-          {isSampleMode && (
-            <div className="px-3.5 py-2 bg-amber-50/50 border-b border-amber-200/60 text-[11px] text-amber-800 flex items-center justify-between">
-              <p className="leading-snug">
-                <strong className="font-semibold">Sample Mode:</strong> Viewing pre-recorded bug demo. Click &quot;Run in Sandbox&quot; to run your code!
-              </p>
-              {steps.some((s) => s.event_type === "exception") && (
-                <button
-                  onClick={handleJumpToException}
-                  className="flex-shrink-0 text-[10px] text-rose-700 font-medium hover:underline flex items-center gap-1 ml-2"
-                >
-                  <AlertOctagon className="w-3 h-3 text-rose-600" />
-                  Jump to Error
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Scrubber Controls */}
+          {/* Replay Controls (Play, Pause, Step Next/Prev, Speed, Jump) */}
           {totalSteps > 0 && (
-            <div className="p-3 border-b border-zinc-200/70 bg-[#FAFAF8] flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={handlePrevious}
-                    disabled={!canGoPrevious}
-                    data-testid="step-prev-button"
-                    className="px-2 py-1 text-xs font-medium rounded border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-                    title="Previous Step"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    <span>Prev</span>
-                  </button>
-                  <button
-                    onClick={handleNext}
-                    disabled={!canGoNext}
-                    data-testid="step-next-button"
-                    className="px-2 py-1 text-xs font-medium rounded border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-                    title="Next Step"
-                  >
-                    <span>Next</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Step indicator */}
-                <div className="text-[11px] font-mono text-zinc-500">
-                  {currentStep && (
-                    <span>
-                      Line <strong className="text-zinc-800 font-semibold">{currentStep.line_number}</strong>
-                      {" in "}
-                      <code className="text-zinc-700 font-mono bg-zinc-100 px-1 py-0.5 rounded">
-                        {currentStep.function_name}()
-                      </code>
-                    </span>
-                  )}
-                </div>
-
-                {/* Jump to exception button if present in real trace */}
-                {steps.some((s) => s.event_type === "exception") && !isSampleMode && (
-                  <button
-                    onClick={handleJumpToException}
-                    className="text-[10px] text-rose-700 font-medium hover:underline flex items-center gap-1"
-                  >
-                    <AlertOctagon className="w-3 h-3 text-rose-600" />
-                    Jump to Error
-                  </button>
-                )}
+            <div className="p-2 border-b border-zinc-200/70 bg-[#FAFAF8]">
+              <div className="flex items-center justify-between mb-1">
+                <CallStackView currentStep={currentStep} />
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  [Space] Play/Pause • [←/→] Steps
+                </span>
               </div>
-
-              {/* Range Slider for timeline scrubbing */}
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="range"
-                  min={0}
-                  max={totalSteps - 1}
-                  value={activeStepIndex}
-                  onChange={(e) => onSelectStep(parseInt(e.target.value, 10))}
-                  className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-brand-600"
-                  aria-label="Execution timeline scrubber"
-                />
-              </div>
+              <ReplayControls
+                totalSteps={totalSteps}
+                currentStepIndex={activeStepIndex}
+                onSelectStep={onSelectStep}
+                hasException={hasException}
+                exceptionStepIndex={excStepIndex}
+              />
             </div>
           )}
 
-          {/* Main Timeline Card Area */}
+          {/* Step Detail Card */}
           <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-[#FCFCFA]">
             {isSyntaxError ? (
-              /* Syntax Error Card */
               <div
                 data-testid="syntax-error-card"
                 className="p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-950"
@@ -335,12 +352,8 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
                 <p className="font-mono text-[11px] text-rose-800 mt-1">
                   Line {realExecution?.error_line || 1}: {realExecution?.error_message}
                 </p>
-                <p className="text-[11px] text-rose-700 mt-2">
-                  Python could not compile this code. Fix syntax at the indicated line and run again.
-                </p>
               </div>
             ) : totalSteps === 0 && !isLoading ? (
-              /* Empty Ready State */
               <div className="p-8 text-center text-zinc-500">
                 <Layers className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
                 <h4 className="text-xs font-semibold text-zinc-700">Ready to execute</h4>
@@ -349,7 +362,6 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
                 </p>
               </div>
             ) : currentStep ? (
-              /* Active Step Card */
               <div
                 data-testid="active-step-card"
                 className={`p-3 rounded-lg border text-xs transition-all ${
@@ -383,7 +395,7 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
                   </div>
                 )}
 
-                {/* Variable State Inspector */}
+                {/* Variable State Table */}
                 <div>
                   <div className="text-[11px] font-semibold text-zinc-600 mb-1.5 flex items-center justify-between">
                     <span>Variables in Scope</span>
@@ -423,21 +435,9 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
                 </div>
               </div>
             ) : null}
-
-            {/* AI Hypothesis Card */}
-            <div className="p-3 bg-violet-50/50 rounded-lg border border-violet-200/60 text-xs text-violet-900">
-              <div className="flex items-center gap-1.5 font-semibold text-violet-950 mb-1">
-                <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-                <span>AI Diagnostic Hypothesis (Milestone 4 Preview)</span>
-              </div>
-              <p className="text-[11px] text-violet-800 leading-relaxed">
-                In Milestone 4, Google Gemini will analyze this verified execution trace against your
-                expected program behavior to identify the exact moment mental models diverged.
-              </p>
-            </div>
           </div>
 
-          {/* Pane Footer */}
+          {/* Footer */}
           <div className="px-3.5 py-1.5 border-t border-zinc-200/70 bg-zinc-50/50 text-[11px] text-zinc-500 flex items-center justify-between">
             <span>Scrubbing updates code line indicator</span>
             <span className="font-mono">

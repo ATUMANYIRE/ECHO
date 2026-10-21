@@ -49,7 +49,7 @@ class SandboxService:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=2.0)
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5.0)
             return proc.returncode == 0
         except Exception as e:
             logger.warning("Sandbox availability check failed: %s", e)

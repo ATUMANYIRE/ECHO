@@ -98,3 +98,25 @@ Detailed in [`docs/SECURITY.md`](file:///E:/Projects/ECHO/docs/SECURITY.md):
 - Ephemeral containers with `--network none`, `--read-only`, `--tmpfs /tmp:size=16m`, `--cap-drop ALL`, and unprivileged UID.
 - Strict CPU (0.5 cores), memory (128 MB), process (max 64 pids), and wall-clock execution limits (3.0 seconds).
 - In Milestone 1, execution is purposefully disabled at the API and UI level, with clear system badges indicating that the execution engine is scheduled for Milestone 2.
+- In Milestone 2, real isolated execution is activated using disposable Docker containers.
+
+---
+
+## 6. Milestone 3: Causal Timeline Analysis & Comparison Engine
+
+### 6.1 State Evolution Extraction (`frontend/src/lib/timeline-analysis.ts`)
+- **`extractVariableHistories(steps: TraceStep[])`**: Maps all recorded variable names to their sequential values and step metadata.
+- **`extractVariableMutations(steps: TraceStep[])`**: Identifies state changes where $V_t \neq V_{t-1}$, producing a causal mutation trajectory (e.g. `0 → 60 → 80 → 100`).
+
+### 6.2 Side-by-Side Execution Comparison
+- **Divergence Detection without Step-Index Coupling**: Step indices in two runs rarely correspond directly because fixing a bug or adding statements alters line counts and iteration counts. The comparison engine computes:
+  1. Outcome diff (terminal output, return status, and runtime exceptions).
+  2. Variable trajectory alignment (matching variable names across runs and detecting where value sequences diverge).
+  3. First divergence step citation in Run A where the variable first separated from Run B.
+
+### 6.3 Evidence-Grounded Prediction Mode
+- Derives interactive prediction challenges from verified execution snapshots:
+  - Loop variable intermediate mutations.
+  - Final terminal output values.
+  - Runtime exception events.
+- Evaluates student predictions deterministically against container trace facts without relying on simulated AI responses.

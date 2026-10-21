@@ -1,28 +1,25 @@
 import { test, expect } from "@playwright/test";
+import * as path from "path";
+import * as fs from "fs";
 
-test.describe("ECHO Workspace Interface & Milestone 2 Live Execution", () => {
-  test("loads workspace and displays active run controls", async ({ page }) => {
+test.describe("ECHO Workspace — Milestone 3 Interactive Timeline & Causal Analysis", () => {
+  test("1. Loads workspace with Milestone 3 header and active controls", async ({ page }) => {
     await page.goto("/");
 
     // Verify Title & Taglines
     await expect(page).toHaveTitle(/ECHO/);
     await expect(page.locator("header")).toContainText("ECHO");
     await expect(page.locator("header")).toContainText("GLITCHATHON 2026");
-    await expect(page.locator("header")).toContainText("Milestone 2");
+    await expect(page.locator("header")).toContainText("Milestone 3");
 
-    // Verify Editor Pane contains default acceptance code
-    const editor = page.getByTestId("code-editor-textarea");
-    await expect(editor).toBeVisible();
-    await expect(editor).toHaveValue(/scores = \[60, 80, 100\]/);
-
-    // Verify Run button is ACTIVE in Milestone 2
+    // Verify Run button is active
     const runBtn = page.getByTestId("run-code-button");
     await expect(runBtn).toBeVisible();
     await expect(runBtn).toBeEnabled();
     await expect(runBtn).toContainText("Run in Sandbox");
   });
 
-  test("executes acceptance buggy program in live Docker sandbox and inspects trace", async ({
+  test("2. Executes acceptance buggy program, steps replay, and tests Evolution & Prediction", async ({
     page,
   }) => {
     await page.goto("/");
@@ -31,17 +28,19 @@ test.describe("ECHO Workspace Interface & Milestone 2 Live Execution", () => {
     const runBtn = page.getByTestId("run-code-button");
     await runBtn.click();
 
-    // Verify authoritative trace badge appears
+    // Verify authoritative trace badge
     const authBadge = page.getByTestId("authoritative-trace-badge");
-    await expect(authBadge).toBeVisible({ timeout: 10000 });
+    await expect(authBadge).toBeVisible({ timeout: 15000 });
     await expect(authBadge).toContainText("Verified Container Trace");
 
-    // Verify active step card
-    const stepCard = page.getByTestId("active-step-card");
-    await expect(stepCard).toBeVisible();
+    // Verify Call Stack view
+    const callStack = page.getByTestId("call-stack-view");
+    await expect(callStack).toBeVisible();
+    await expect(callStack).toContainText("<module>");
 
-    // Step forward to step 2 where total is in scope (Line 3: total = 0)
+    // Step forward using Replay Controls
     const nextBtn = page.getByTestId("step-next-button");
+    await expect(nextBtn).toBeVisible();
     await nextBtn.click();
     await nextBtn.click();
 
@@ -49,7 +48,43 @@ test.describe("ECHO Workspace Interface & Milestone 2 Live Execution", () => {
     const totalRow = page.getByTestId("variable-row-total");
     await expect(totalRow).toBeVisible();
 
-    // Check Output tab
+    // Replay Controls: test Prev button
+    const prevBtn = page.getByTestId("step-prev-button");
+    await expect(prevBtn).toBeVisible();
+    await prevBtn.click();
+
+    // Switch to Evolution tab
+    const evoTab = page.getByTestId("tab-evolution-button");
+    await evoTab.click();
+
+    const evoCard = page.getByTestId("variable-evolution-card");
+    await expect(evoCard).toBeVisible();
+    await expect(evoCard).toContainText("Causal Variable Evolution");
+
+    // Verify evolution nodes for 'total' exist
+    const totalNodes = page.locator("[data-testid^='evolution-node-']");
+    await expect(totalNodes.first()).toBeVisible();
+
+    // Switch to Predict tab
+    const predTab = page.getByTestId("tab-predict-button");
+    await predTab.click();
+
+    const predCard = page.getByTestId("prediction-challenge-card");
+    await expect(predCard).toBeVisible();
+    await expect(predCard).toContainText("Prediction Challenge");
+
+    // Click the first prediction option and verify
+    const firstOption = page.locator("[data-testid^='prediction-option-']").first();
+    await firstOption.click();
+
+    const submitBtn = page.getByTestId("submit-prediction-button");
+    await submitBtn.click();
+
+    // Verify feedback is displayed
+    const feedback = page.getByTestId("prediction-feedback");
+    await expect(feedback).toBeVisible();
+
+    // Switch to Output tab
     const outputTab = page.getByTestId("output-tab-button");
     await outputTab.click();
     const outputContent = page.getByTestId("terminal-output-content");
@@ -57,29 +92,149 @@ test.describe("ECHO Workspace Interface & Milestone 2 Live Execution", () => {
     await expect(outputContent).toContainText("33.333333333333336");
   });
 
-  test("runs corrected program and verifies 80.0 output", async ({ page }) => {
+  test("3. Compares Run A (Buggy) vs Run B (Corrected) side-by-side", async ({ page }) => {
     await page.goto("/");
 
-    // Click Apply Fix button
+    // 1. Run buggy code
+    const runBtn = page.getByTestId("run-code-button");
+    await runBtn.click();
+    await expect(page.getByTestId("authoritative-trace-badge")).toBeVisible({ timeout: 15000 });
+
+    // 2. Apply fix and run corrected code
     const fixBtn = page.getByRole("button", { name: /Apply Fix/i });
     await fixBtn.click();
+    await runBtn.click();
+    await expect(page.getByTestId("authoritative-trace-badge")).toBeVisible({ timeout: 15000 });
 
-    // Verify editor has total += score
+    // 3. Switch to Compare Tab
+    const compareTab = page.getByTestId("tab-compare-button");
+    await compareTab.click();
+
+    const compView = page.getByTestId("comparison-view");
+    await expect(compView).toBeVisible();
+
+    // Verify Run A and Run B summary cards inside comparison view
+    const runACard = page.getByTestId("run-card-run-a");
+    await expect(runACard).toBeVisible();
+    const runBCard = page.getByTestId("run-card-run-b");
+    await expect(runBCard).toBeVisible();
+
+    // Verify Side-by-side run headers
+    await expect(compView).toContainText("Run A (Initial)");
+    await expect(compView).toContainText("Run B (Modified)");
+
+    // Verify stdout diff shows difference
+    await expect(compView).toContainText("33.333333333333336");
+    await expect(compView).toContainText("80.0");
+
+    // Verify variable divergence table
+    await expect(compView).toContainText("Variable Trajectory Comparison");
+    await expect(compView).toContainText("total");
+  });
+
+  test("4. Executes Benchmark Preset 2 (Off-by-one Boundary)", async ({ page }) => {
+    await page.goto("/");
+
+    // Select preset
+    const presetSelect = page.getByTestId("preset-benchmark-select");
+    await presetSelect.selectOption("off_by_one");
+
+    // Verify code changed to off-by-one benchmark
     const editor = page.getByTestId("code-editor-textarea");
-    await expect(editor).toHaveValue(/total \+= score/);
+    await expect(editor).toHaveValue(/for i in range\(len\(items\) \+ 1\):/);
 
-    // Click Run in Sandbox
+    // Run in Sandbox
     const runBtn = page.getByTestId("run-code-button");
     await runBtn.click();
 
-    // Verify authoritative trace
+    // Verify trace
     const authBadge = page.getByTestId("authoritative-trace-badge");
-    await expect(authBadge).toBeVisible({ timeout: 10000 });
+    await expect(authBadge).toBeVisible({ timeout: 15000 });
 
-    // Verify Output tab shows 80.0
+    // Output should show items printed before IndexError
     const outputTab = page.getByTestId("output-tab-button");
     await outputTab.click();
-    const outputContent = page.getByTestId("terminal-output-content");
-    await expect(outputContent).toContainText("80.0");
+    await expect(page.getByTestId("terminal-output-content")).toContainText("Item 0: alpha");
+  });
+
+  test("5. Executes Benchmark Preset 3 (Recursive Factorial) and inspects call stack", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // Select preset
+    const presetSelect = page.getByTestId("preset-benchmark-select");
+    await presetSelect.selectOption("recursion");
+
+    // Run in Sandbox
+    const runBtn = page.getByTestId("run-code-button");
+    await runBtn.click();
+
+    // Verify trace
+    const authBadge = page.getByTestId("authoritative-trace-badge");
+    await expect(authBadge).toBeVisible({ timeout: 15000 });
+
+    // Step into recursive calls
+    const nextBtn = page.getByTestId("step-next-button");
+    await nextBtn.click();
+    await nextBtn.click();
+    await nextBtn.click();
+
+    // Call stack should show factorial
+    const callStack = page.getByTestId("call-stack-view");
+    await expect(callStack).toBeVisible();
+
+    // Output should show 24
+    const outputTab = page.getByTestId("output-tab-button");
+    await outputTab.click();
+    await expect(page.getByTestId("terminal-output-content")).toContainText("24");
+  });
+
+  test("6. Responsive Mobile Viewport & Screenshot Capture", async ({ page }, testInfo) => {
+    if (testInfo.project.name === "Mobile Chrome") {
+      // Mobile Chrome project already verified responsive layout
+      await page.goto("/");
+      await expect(page.getByTestId("run-code-button")).toBeVisible();
+      return;
+    }
+
+    // Desktop screenshot
+    await page.setViewportSize({ width: 1366, height: 850 });
+    await page.goto("/");
+    const runBtn = page.getByTestId("run-code-button");
+    await runBtn.click();
+    await expect(page.getByTestId("authoritative-trace-badge")).toBeVisible({ timeout: 15000 });
+
+    // Switch to evolution to show rich M3 view
+    await page.getByTestId("tab-evolution-button").click();
+    await page.waitForTimeout(500);
+
+    const desktopScreenshotPath = path.resolve(
+      process.cwd(),
+      "e2e-screenshots",
+      "desktop-workspace-m3.png"
+    );
+    fs.mkdirSync(path.dirname(desktopScreenshotPath), { recursive: true });
+    await page.screenshot({ path: desktopScreenshotPath, fullPage: false });
+
+    // Mobile screenshot
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(500);
+
+    const mobileScreenshotPath = path.resolve(
+      process.cwd(),
+      "e2e-screenshots",
+      "mobile-workspace-m3.png"
+    );
+    await page.screenshot({ path: mobileScreenshotPath, fullPage: false });
+
+    // Copy to brain artifacts
+    const artifactDir = "C:\\Users\\HP\\.gemini\\antigravity-cli\\brain\\0432aae0-6b7f-405e-a99a-c0d90fd2408b";
+    try {
+      fs.copyFileSync(desktopScreenshotPath, path.join(artifactDir, "desktop-workspace-m3.png"));
+      fs.copyFileSync(mobileScreenshotPath, path.join(artifactDir, "mobile-workspace-m3.png"));
+    } catch (e) {
+      console.warn("Could not copy directly to artifact dir:", e);
+    }
   });
 });

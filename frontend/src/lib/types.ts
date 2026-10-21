@@ -73,3 +73,60 @@ export interface SampleTraceData {
   is_authoritative: false;
   disclaimer: string;
 }
+
+/** Milestone 3 Causal Investigation Models */
+
+export interface VariableHistoryPoint {
+  step_index: number;
+  line_number: number;
+  value: string;
+  type_name: string;
+  is_changed: boolean;
+  function_name: string;
+}
+
+export interface ExecutionRunRecord {
+  id: string;
+  label: string;
+  code: string;
+  response: ExecutionResponse;
+  timestamp: string;
+}
+
+export interface ComparisonDiff {
+  variableName: string;
+  historyA: string[];
+  historyB: string[];
+  isDifferent: boolean;
+}
+
+export interface RunComparisonResult {
+  runA: ExecutionRunRecord;
+  runB: ExecutionRunRecord;
+  stdoutDiff: {
+    match: boolean;
+    stdoutA: string;
+    stdoutB: string;
+  };
+  statusDiff: {
+    match: boolean;
+    statusA: ExecutionStatus;
+    statusB: ExecutionStatus;
+  };
+  variableDiffs: ComparisonDiff[];
+  divergenceStepA?: number;
+  divergenceStepB?: number;
+  explanation: string;
+}
+
+export interface PredictionChallenge {
+  id: string;
+  step_index: number;
+  line_number: number;
+  prompt: string;
+  question: string;
+  target_variable: string;
+  options: string[];
+  correct_option_index: number;
+  explanation: string;
+}

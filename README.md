@@ -2,7 +2,7 @@
 
 > **Tagline:** *Don't just fix the mistake. Understand the moment it was made.*  
 > **GLITCHATHON 2026 Submission** | Target Deadline: October 25, 2026, 13:30 GMT+2  
-> **Current Status:** Milestone 2 Complete (Secure Execution & Real-Time Code Tracing)
+> **Current Status:** Milestone 3 Complete (Interactive Time-Travel Debugger & Causal Analysis)
 
 ---
 
@@ -15,21 +15,31 @@ ECHO helps computer science students understand **why** and **when** their code 
 When a student submits code:
 1. Untrusted code executes inside an isolated, disposable Docker container (`echo-runner`).
 2. Authoritative execution events and local variable mutations are captured step-by-step using `sys.settrace`.
-3. Students navigate an interactive execution timeline to scrub across state mutations and line executions.
-4. AI analyzes the divergence between the student's expected outcome and the authoritative trace to explain the root misconception without hallucinations (Milestone 4).
-5. Targeted comprehension micro-quizzes verify student understanding (Milestone 5).
+3. Students navigate an interactive time-travel timeline with replay controls (play/pause, speed, scrubber).
+4. Students inspect causal variable state trajectories (e.g. `0 → 60 → 80 → 100` vs. `0 → 60 → 140 → 240`).
+5. Students compare baseline and modified executions side-by-side with decoupled variable divergence analysis.
+6. Students test their mental model with interactive prediction challenges grounded in verified trace facts.
+7. AI analyzes the divergence between the student's expected outcome and the authoritative trace (Milestone 4).
 
 ---
 
-## 2. Milestone 2 Scope & Status
+## 2. Milestone 3 Scope & Capabilities
 
-Milestone 2 activates genuine, secure code execution and tracing:
-- **Disposable Container Runner:** Ephemeral Docker runner (`echo-runner:latest`) running non-root (`10001:10001`), network disabled (`--network none`), read-only rootfs, `noexec` tmpfs, CPU/memory limits, and hard execution timeouts.
-- **Authoritative Trace Recorder:** Real-time line events, call/return frames, runtime exceptions, stdout deltas, and local variable diffs (`is_changed`).
-- **Activated API:** `POST /api/execution/run` accepts Python source code and returns verified execution traces.
-- **Live Frontend Integration:** Code editor and "Run in Sandbox" button execute real student code; execution timeline updates with genuine traces; Terminal Output panel displays stdout/stderr/durations.
-- **Fail-Safe Policy:** If Docker is unavailable, the API explicitly refuses execution (`sandbox_unavailable`) rather than executing untrusted code on the host.
-- **Full Test Harness:** 41 passing automated tests across backend (`pytest`), frontend unit (`vitest`), and Playwright browser E2E suites.
+Milestone 3 delivers a complete interactive time-travel debugging laboratory:
+- **Time-Travel Replay Engine:** Play/Pause with customizable playback speed (`0.5x`, `1.0x`, `2.0x`, `4.0x`), Step Next/Prev, Jump to Error, Jump to Start, timeline scrubber, and keyboard accessibility (`Space`, `←`, `→`, `Home`, `End`).
+- **Causal Variable Evolution:** Visual progression of variable mutations across execution steps with clickable nodes jumping directly to the corresponding editor line and trace step.
+- **Before-and-After Side-by-Side Comparison:** Compares Run A (Baseline) and Run B (Modified) side-by-side without assuming identical step indices, identifying stdout differences and variable trajectory divergence.
+- **Evidence-Grounded Prediction Mode:** Multiple-choice checkpoints derived from recorded execution events, verified deterministically against container trace facts (zero hallucinations).
+- **Call Stack Frame Inspector:** Real-time visibility into active function names, recursion depth, and line positions.
+- **Educational Benchmark Presets:**
+  1. *Accumulator Overwrite:* `scores = [60, 80, 100]`, `total = score` vs `total += score`.
+  2. *Off-by-One Boundary:* `range(len(items) + 1)` leading to `IndexError`.
+  3. *Recursive Factorial:* `factorial(4)` demonstrating nested frame transitions.
+- **Comprehensive Automated Test Harness:** 49 automated tests passing:
+  - 24 Pytest backend integration & security tests
+  - 13 Vitest frontend unit tests
+  - 12 Playwright E2E browser tests (Desktop & Mobile Chrome)
+  - 0 TypeScript compiler errors under `strict: true`
 
 ---
 
@@ -121,7 +131,7 @@ Detailed specifications are maintained in [`docs/SECURITY.md`](file:///E:/Projec
 - **Untrusted Student Code:** Never executed on the host interpreter or within the API process.
 - **Physical Isolation:** Ephemeral Linux containers with dropped capabilities (`--cap-drop ALL`), non-root execution (`--user 10001:10001`), read-only rootfs, `tmpfs /tmp:size=16m`, and hard memory/CPU/PID bounds.
 - **Fail-Safe Policy:** If Docker is unreachable, untrusted execution is explicitly refused rather than falling back to unsafe local execution.
-- **Milestone 1 Guarantee:** Untrusted code execution is disabled by design in Milestone 1; the timeline visualizes explicitly labeled sample data.
+- **Isolation Guarantee:** Untrusted code execution runs exclusively inside disposable, isolated Docker containers with zero network access and strict resource boundaries; all time-travel scrubbing, causal evolution analysis, and prediction challenges operate on genuine container execution traces.
 
 ---
 

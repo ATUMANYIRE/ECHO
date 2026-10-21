@@ -293,3 +293,50 @@ async def test_sandbox_unavailable_fallback(async_client: AsyncClient):
         assert data["status"] == "sandbox_unavailable"
         assert "strictly prohibited" in data["error_message"]
         assert data["is_authoritative"] is False
+
+
+@pytest.mark.asyncio
+async def test_off_by_one_benchmark_program(async_client: AsyncClient):
+    """Verify Benchmark Program 2: Off-by-one list boundary raising IndexError."""
+    code = (
+        "items = ['alpha', 'beta', 'gamma']\n"
+        "for i in range(len(items) + 1):\n"
+        "    print(f'Item {i}: {items[i]}')\n"
+    )
+    response = await async_client.post("/api/execution/run", json={"code": code})
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "error"
+    assert "IndexError" in data["error_message"]
+    assert "Item 0: alpha" in data["stdout"]
+    assert "Item 1: beta" in data["stdout"]
+    assert "Item 2: gamma" in data["stdout"]
+    exc_steps = [s for s in data["steps"] if s["event_type"] == "exception"]
+    assert len(exc_steps) > 0
+    assert exc_steps[-1]["line_number"] == 3
+
+
+@pytest.mark.asyncio
+async def test_recursive_factorial_benchmark_program(async_client: AsyncClient):
+    """Verify Benchmark Program 3: Recursive function frames and call stack returns."""
+    code = (
+        "def factorial(n):\n"
+        "    if n <= 1:\n"
+        "        return 1\n"
+        "    return n * factorial(n - 1)\n"
+        "\n"
+        "result = factorial(4)\n"
+        "print(f'4! = {result}')\n"
+    )
+    response = await async_client.post("/api/execution/run", json={"code": code})
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "completed"
+    assert "4! = 24" in data["stdout"]
+    steps = data["steps"]
+    factorial_steps = [s for s in steps if s["function_name"] == "factorial"]
+    assert len(factorial_steps) > 0
+    return_steps = [s for s in factorial_steps if s["event_type"] == "return"]
+    assert len(return_steps) == 4

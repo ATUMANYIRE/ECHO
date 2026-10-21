@@ -1,7 +1,7 @@
-# ECHO Full Foundation & Milestone 2 Test Runner
-Write-Host "=== Running ECHO Milestone 2 Automated Test Suites ===" -ForegroundColor Cyan
+# ECHO Full Milestone 3 Test Runner
+Write-Host "=== Running ECHO Milestone 3 Automated Test Suites ===" -ForegroundColor Cyan
 
-Write-Host "`n[1/3] Running Backend Tests (pytest with isolated Docker sandbox)..." -ForegroundColor Yellow
+Write-Host "`n[1/4] Running Backend Tests (pytest with isolated Docker sandbox & benchmarks)..." -ForegroundColor Yellow
 if (Test-Path ".\backend\venv\Scripts\pytest.exe") {
     & ".\backend\venv\Scripts\pytest.exe" backend\tests -v
 } else {
@@ -13,7 +13,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "`n[2/3] Running Frontend Unit Tests (vitest)..." -ForegroundColor Yellow
+Write-Host "`n[2/4] Running Frontend Unit Tests (vitest: api, timeline analysis & workspace)..." -ForegroundColor Yellow
 npm test --prefix frontend
 
 if ($LASTEXITCODE -ne 0) {
@@ -21,7 +21,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "`n[3/3] Checking Frontend TypeScript Types..." -ForegroundColor Yellow
+Write-Host "`n[3/4] Checking Frontend TypeScript Types (strict mode)..." -ForegroundColor Yellow
 npm run type-check --prefix frontend
 
 if ($LASTEXITCODE -ne 0) {
@@ -29,4 +29,15 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "`n=== All ECHO Milestone 2 Tests Passed Successfully! ===" -ForegroundColor Green
+Write-Host "`n[4/4] Running Playwright E2E Browser Suite (replay, evolution, comparison, benchmarks)..." -ForegroundColor Yellow
+Push-Location frontend
+npx playwright test
+$playwrightCode = $LASTEXITCODE
+Pop-Location
+
+if ($playwrightCode -ne 0) {
+    Write-Host "Playwright E2E tests failed!" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "`n=== All ECHO Milestone 3 Tests (49 automated tests) Passed Successfully! ===" -ForegroundColor Green

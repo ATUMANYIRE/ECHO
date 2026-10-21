@@ -7,17 +7,29 @@ import { ExpectedBehaviorPane } from "./ExpectedBehaviorPane";
 import { ControlBar } from "./ControlBar";
 import { ExecutionTimelinePane } from "./ExecutionTimelinePane";
 import { getBackendHealth, executeCode } from "@/lib/api-client";
-import { HealthResponse, ExecutionResponse } from "@/lib/types";
+import { HealthResponse, ExecutionResponse, ExecutionRunRecord } from "@/lib/types";
 import { SAMPLE_TRACE } from "@/lib/sample-data";
 
-const DEFAULT_ACCEPTANCE_CODE = `scores = [60, 80, 100]
+// 3 Distinct Educational Benchmark Programs
+const PROGRAM_ACCUMULATOR_BUG = `scores = [60, 80, 100]
 total = 0
 for score in scores:
     total = score
 average = total / len(scores)
 print(average)`;
 
-const DEFAULT_EXPECTED_BEHAVIOR = "Iterate through scores [60, 80, 100], sum all values, and calculate average: 80.0";
+const PROGRAM_OFF_BY_ONE = `items = ["alpha", "beta", "gamma"]
+# Bug: range(len + 1) indexes past list bounds
+for i in range(len(items) + 1):
+    print(f"Item {i}: {items[i]}")`;
+
+const PROGRAM_RECURSIVE_FACTORIAL = `def factorial(n):
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
+
+result = factorial(4)
+print(f"4! = {result}")`;
 
 export const WorkspaceShell: React.FC = () => {
   // Backend connectivity state
@@ -26,13 +38,19 @@ export const WorkspaceShell: React.FC = () => {
   const [healthError, setHealthError] = useState<string | null>(null);
 
   // Editor and Intent state
-  const [code, setCode] = useState<string>(DEFAULT_ACCEPTANCE_CODE);
-  const [expectedBehavior, setExpectedBehavior] = useState<string>(DEFAULT_EXPECTED_BEHAVIOR);
+  const [code, setCode] = useState<string>(PROGRAM_ACCUMULATOR_BUG);
+  const [expectedBehavior, setExpectedBehavior] = useState<string>(
+    "Iterate through scores [60, 80, 100], sum all values, and calculate average: 80.0"
+  );
 
   // Execution state
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [realExecution, setRealExecution] = useState<ExecutionResponse | null>(null);
   const [isSampleMode, setIsSampleMode] = useState<boolean>(false);
+
+  // Run History Comparison state (Before and After)
+  const [runA, setRunA] = useState<ExecutionRunRecord | null>(null);
+  const [runB, setRunB] = useState<ExecutionRunRecord | null>(null);
 
   // Timeline scrubber state
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
@@ -72,8 +90,22 @@ export const WorkspaceShell: React.FC = () => {
       setRealExecution(result);
       setIsSampleMode(false);
       setActiveStepIndex(0);
+
+      // Track into Run A or Run B comparison history
+      const record: ExecutionRunRecord = {
+        id: result.execution_id,
+        label: runA ? "Run B (Modified)" : "Run A (Initial)",
+        code,
+        response: result,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+
+      if (!runA) {
+        setRunA(record);
+      } else {
+        setRunB(record);
+      }
     } catch (err: unknown) {
-      // In case of network error or client timeout
       setRealExecution({
         execution_id: "err-fallback",
         status: "error",
@@ -115,9 +147,10 @@ export const WorkspaceShell: React.FC = () => {
     if (excStep) errorLine = excStep.line_number;
   }
 
-  const handleResetToAcceptanceBug = () => {
-    setCode(DEFAULT_ACCEPTANCE_CODE);
-    setExpectedBehavior(DEFAULT_EXPECTED_BEHAVIOR);
+  // Presets
+  const handleLoadAccumulatorBug = () => {
+    setCode(PROGRAM_ACCUMULATOR_BUG);
+    setExpectedBehavior("Iterate through scores [60, 80, 100], sum all values, and calculate average: 80.0");
     setRealExecution(null);
     setIsSampleMode(false);
     setActiveStepIndex(0);
@@ -128,10 +161,26 @@ export const WorkspaceShell: React.FC = () => {
     setCode(fixedCode);
   };
 
-  const handleLoadSampleMode = () => {
-    setCode(SAMPLE_TRACE.code);
-    setExpectedBehavior(SAMPLE_TRACE.expected_behavior);
-    setIsSampleMode(true);
+  const handleLoadOffByOne = () => {
+    setCode(PROGRAM_OFF_BY_ONE);
+    setExpectedBehavior("Iterate through items ['alpha', 'beta', 'gamma'] and print item 0, 1, 2 without IndexError.");
+    setRealExecution(null);
+    setIsSampleMode(false);
+    setActiveStepIndex(0);
+  };
+
+  const handleLoadRecursion = () => {
+    setCode(PROGRAM_RECURSIVE_FACTORIAL);
+    setExpectedBehavior("Recursively compute factorial of 4, returning 24.");
+    setRealExecution(null);
+    setIsSampleMode(false);
+    setActiveStepIndex(0);
+  };
+
+  const handleSelectRun = (record: ExecutionRunRecord) => {
+    setCode(record.code);
+    setRealExecution(record.response);
+    setIsSampleMode(false);
     setActiveStepIndex(0);
   };
 
@@ -155,41 +204,80 @@ export const WorkspaceShell: React.FC = () => {
                 onChange={setCode}
                 activeLine={activeLine}
                 errorLine={errorLine}
-                onResetToSample={handleResetToAcceptanceBug}
+                onResetToSample={handleLoadAccumulatorBug}
               />
             </div>
 
-            <div className="flex-shrink-0 flex items-center justify-between gap-2 px-1">
-              <div className="flex items-center gap-1.5 text-[11px]">
-                <button
-                  onClick={handleResetToAcceptanceBug}
-                  className="px-2 py-1 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition-colors"
-                  title="Load acceptance bug: total = score"
+            {/* Quick Benchmark Presets Bar */}
+            <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 px-1 text-[11px]">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-zinc-400 font-medium">Benchmarks:</span>
+                <select
+                  data-testid="preset-benchmark-select"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "accumulator") handleLoadAccumulatorBug();
+                    else if (val === "off_by_one") handleLoadOffByOne();
+                    else if (val === "recursion") handleLoadRecursion();
+                  }}
+                  className="px-2 py-0.5 text-xs rounded border border-zinc-200 bg-white text-zinc-700 outline-none cursor-pointer"
+                  aria-label="Benchmark preset selector"
                 >
-                  Load Buggy Program
-                </button>
+                  <option value="accumulator">Accumulator Bug</option>
+                  <option value="off_by_one">Off-By-One Bug</option>
+                  <option value="recursion">Recursion Frame</option>
+                </select>
                 <button
                   onClick={handleApplyFix}
-                  className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors font-medium"
-                  title="Apply fix: change total = score to total += score"
+                  className="px-2 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors font-medium"
+                  title="Apply fix: total += score"
                 >
-                  Apply Fix (total += score)
-                </button>
-                <button
-                  onClick={handleLoadSampleMode}
-                  className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 transition-colors"
-                  title="Load illustrative off-by-one demo"
-                >
-                  Load Sample Demo
+                  Apply Fix (+=)
                 </button>
               </div>
+
+              {/* Tag as Run A or Run B */}
+              {realExecution && (
+                <div className="flex items-center gap-1 text-[10px]">
+                  <button
+                    onClick={() =>
+                      setRunA({
+                        id: realExecution.execution_id,
+                        label: "Run A (Baseline)",
+                        code,
+                        response: realExecution,
+                        timestamp: new Date().toLocaleTimeString(),
+                      })
+                    }
+                    className="px-1.5 py-0.5 rounded border border-zinc-300 text-zinc-600 hover:bg-zinc-100"
+                    title="Pin current execution as Run A"
+                  >
+                    Set as Run A
+                  </button>
+                  <button
+                    onClick={() =>
+                      setRunB({
+                        id: realExecution.execution_id,
+                        label: "Run B (Comparison)",
+                        code,
+                        response: realExecution,
+                        timestamp: new Date().toLocaleTimeString(),
+                      })
+                    }
+                    className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-medium"
+                    title="Pin current execution as Run B"
+                  >
+                    Set as Run B
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex-shrink-0">
               <ExpectedBehaviorPane
                 value={expectedBehavior}
                 onChange={setExpectedBehavior}
-                onResetToSample={handleResetToAcceptanceBug}
+                onResetToSample={handleLoadAccumulatorBug}
               />
             </div>
           </div>
@@ -214,6 +302,9 @@ export const WorkspaceShell: React.FC = () => {
                 activeStepIndex={activeStepIndex}
                 onSelectStep={setActiveStepIndex}
                 onSwitchToReal={() => setIsSampleMode(false)}
+                runA={runA}
+                runB={runB}
+                onSelectRun={handleSelectRun}
               />
             </div>
           </div>

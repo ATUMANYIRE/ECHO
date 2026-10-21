@@ -19,14 +19,14 @@ class HealthResponse(BaseModel):
         description="Whether the isolated container runtime is reachable on the host",
     )
     execution_enabled: bool = Field(
-        default=False,
+        default=True,
         description="Whether untrusted code execution is active in this milestone",
     )
     milestone: str = Field(
-        default="Milestone 1: Production-Quality Foundation",
+        default="Milestone 3: Interactive Timeline & Variable State Inspection",
         description="Active product milestone",
     )
     message: Optional[str] = Field(
-        default="ECHO API is operational. Code execution engine is scheduled for Milestone 2.",
+        default="ECHO API is operational. Isolated Docker runner & interactive timeline active.",
         description="System status message",
     )

@@ -53,6 +53,28 @@ ECHO follows a strict testing discipline:
   - Desktop viewports (1440x900) verifying workspace fit and absence of unintended page scroll.
   - Mobile viewports (390x844) verifying responsive stacking.
 
+### Milestone 3: Interactive Replay, Causal Evolution & Side-by-Side Comparison
+- **Backend Pytest (24 tests):**
+  - All Milestone 2 sandbox isolation and security limits preserved.
+  - Added benchmark tests:
+    - `test_off_by_one_benchmark_program`: verifies `IndexError` at list boundary with captured output before crash.
+    - `test_recursive_factorial_benchmark_program`: verifies nested function frame calls, arguments, and return value `24`.
+- **Frontend Vitest (13 tests):**
+  - `extractVariableHistories`: verifies extraction of full variable state snapshots across execution.
+  - `extractVariableMutations`: verifies sequential deduplication and mutation delta tracking.
+  - `compareExecutions`: verifies outcome and trajectory divergence detection without step index coupling.
+  - `generatePredictionChallenges`: verifies evidence-grounded interactive challenges derived directly from trace events.
+  - Workspace components tests (header, editor, controls, workbench tabs, replay controls).
+- **Playwright E2E Browser Suite (12 tests across Desktop & Mobile Chrome):**
+  - Workspace loads with Milestone 3 badge and controls active.
+  - Replay controls: Play/pause timer, speed selection (0.5x, 1x, 2x, 4x), stepping (Next/Prev), scrub slider, call stack frame viewer.
+  - Causal Evolution tab: variable selection dropdown, mutation trajectory nodes (`0 → 60 → 80`), clickable nodes jumping to editor lines.
+  - Prediction mode: interactive multiple-choice question validated against trace evidence with immediate feedback.
+  - Before-and-After Comparison view: side-by-side Run A (Initial) vs Run B (Modified) cards, terminal stdout diff (`33.333333333333336` vs `80.0`), variable divergence table (`0 → 60 → 80 → 100` vs `0 → 60 → 140 → 240`).
+  - Benchmark Preset 2 (Off-by-One Boundary): preset selection, execution in Docker, output `Item 0: alpha` before `IndexError`.
+  - Benchmark Preset 3 (Recursive Factorial): preset selection, execution, recursive `factorial` call stack inspection, output `4! = 24`.
+  - Mobile responsiveness: clean adaptive layout on 390x844 viewport with verified controls.
+
 ---
 
 ## 3. Windows PowerShell Test Commands
