@@ -1,0 +1,43 @@
+# Git ignore for ECHO
+
+# Node / Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env*.local
+frontend/coverage/
+
+# Python / Backend
+backend/__pycache__/
+backend/*/__pycache__/
+backend/*/*/__pycache__/
+backend/*.pyc
+backend/.pytest_cache/
+backend/.venv/
+backend/venv/
+backend/env/
+backend/.mypy_cache/
+backend/.coverage
+backend/htmlcov/
+
+# Environment and Secrets
+.env
+.env.local
+backend/.env
+frontend/.env
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Test / Playwright
+test-results/
+playwright-report/
+blob-report/
+frontend/tsconfig.tsbuildinfo
