@@ -5,9 +5,14 @@ import { WorkspaceHeader } from "./WorkspaceHeader";
 import { CodeEditorPane } from "./CodeEditorPane";
 import { ExpectedBehaviorPane } from "./ExpectedBehaviorPane";
 import { ControlBar } from "./ControlBar";
-import { ExecutionTimelinePane } from "./ExecutionTimelinePane";
-import { getBackendHealth, executeCode } from "@/lib/api-client";
-import { HealthResponse, ExecutionResponse, ExecutionRunRecord } from "@/lib/types";
+import { ExecutionTimelinePane, TimelineTab } from "./ExecutionTimelinePane";
+import { getBackendHealth, executeCode, analyzeInvestigation } from "@/lib/api-client";
+import {
+  HealthResponse,
+  ExecutionResponse,
+  ExecutionRunRecord,
+  InvestigationResponse,
+} from "@/lib/types";
 import { SAMPLE_TRACE } from "@/lib/sample-data";
 
 // 3 Distinct Educational Benchmark Programs
@@ -54,6 +59,35 @@ export const WorkspaceShell: React.FC = () => {
 
   // Timeline scrubber state
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
+
+  // AI Investigation state (Milestone 4)
+  const [investigation, setInvestigation] = useState<InvestigationResponse | null>(null);
+  const [isInvestigating, setIsInvestigating] = useState<boolean>(false);
+  const [activeTimelineTab, setActiveTimelineTab] = useState<TimelineTab>("timeline");
+
+  const handleInvestigate = async () => {
+    if (!realExecution || isInvestigating) return;
+
+    try {
+      setIsInvestigating(true);
+      setActiveTimelineTab("investigate");
+      const res = await analyzeInvestigation({
+        code,
+        expected_behavior: expectedBehavior,
+        execution: realExecution,
+        comparison_execution: runB?.response || null,
+      });
+      setInvestigation(res);
+    } catch (err) {
+      console.error("AI Investigation failed:", err);
+    } finally {
+      setIsInvestigating(false);
+    }
+  };
+
+  const handleApplySuggestedFix = (newCode: string) => {
+    setCode(newCode);
+  };
 
   // Check health on mount
   const checkHealth = useCallback(async () => {
@@ -290,6 +324,9 @@ export const WorkspaceShell: React.FC = () => {
                 isRunning={isRunning}
                 canRun={code.trim().length > 0}
                 executionStatus={realExecution?.status}
+                onInvestigate={handleInvestigate}
+                isInvestigating={isInvestigating}
+                canInvestigate={!!realExecution}
               />
             </div>
 
@@ -305,6 +342,12 @@ export const WorkspaceShell: React.FC = () => {
                 runA={runA}
                 runB={runB}
                 onSelectRun={handleSelectRun}
+                investigation={investigation}
+                isInvestigating={isInvestigating}
+                onApplyFix={handleApplySuggestedFix}
+                originalCode={code}
+                activeTab={activeTimelineTab}
+                onChangeTab={setActiveTimelineTab}
               />
             </div>
           </div>

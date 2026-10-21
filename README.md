@@ -2,7 +2,7 @@
 
 > **Tagline:** *Don't just fix the mistake. Understand the moment it was made.*  
 > **GLITCHATHON 2026 Submission** | Target Deadline: October 25, 2026, 13:30 GMT+2  
-> **Current Status:** Milestone 3 Complete (Interactive Time-Travel Debugger & Causal Analysis)
+> **Current Status:** Milestone 4 Complete (Evidence-Grounded Gemini AI Investigator)
 
 ---
 
@@ -19,26 +19,24 @@ When a student submits code:
 4. Students inspect causal variable state trajectories (e.g. `0 → 60 → 80 → 100` vs. `0 → 60 → 140 → 240`).
 5. Students compare baseline and modified executions side-by-side with decoupled variable divergence analysis.
 6. Students test their mental model with interactive prediction challenges grounded in verified trace facts.
-7. AI analyzes the divergence between the student's expected outcome and the authoritative trace (Milestone 4).
+7. AI analyzes the divergence between the student's expected outcome and the authoritative trace via an evidence-grounded engine with strict citation validation (Milestone 4).
+8. AI-proposed corrections are verified exclusively inside the Docker sandbox before applying, accompanied by an explicit epistemological disclaimer.
 
 ---
 
-## 2. Milestone 3 Scope & Capabilities
+## 2. Milestone 4 Scope & Capabilities
 
-Milestone 3 delivers a complete interactive time-travel debugging laboratory:
-- **Time-Travel Replay Engine:** Play/Pause with customizable playback speed (`0.5x`, `1.0x`, `2.0x`, `4.0x`), Step Next/Prev, Jump to Error, Jump to Start, timeline scrubber, and keyboard accessibility (`Space`, `←`, `→`, `Home`, `End`).
-- **Causal Variable Evolution:** Visual progression of variable mutations across execution steps with clickable nodes jumping directly to the corresponding editor line and trace step.
-- **Before-and-After Side-by-Side Comparison:** Compares Run A (Baseline) and Run B (Modified) side-by-side without assuming identical step indices, identifying stdout differences and variable trajectory divergence.
-- **Evidence-Grounded Prediction Mode:** Multiple-choice checkpoints derived from recorded execution events, verified deterministically against container trace facts (zero hallucinations).
-- **Call Stack Frame Inspector:** Real-time visibility into active function names, recursion depth, and line positions.
-- **Educational Benchmark Presets:**
-  1. *Accumulator Overwrite:* `scores = [60, 80, 100]`, `total = score` vs `total += score`.
-  2. *Off-by-One Boundary:* `range(len(items) + 1)` leading to `IndexError`.
-  3. *Recursive Factorial:* `factorial(4)` demonstrating nested frame transitions.
-- **Comprehensive Automated Test Harness:** 49 automated tests passing:
-  - 24 Pytest backend integration & security tests
-  - 13 Vitest frontend unit tests
-  - 12 Playwright E2E browser tests (Desktop & Mobile Chrome)
+Milestone 4 delivers a complete evidence-grounded AI diagnostic and pedagogical engine:
+- **Official Google GenAI SDK Provider:** Server-side `GeminiProvider` using official `google-genai` (v2.32.0), reading `GEMINI_API_KEY` exclusively from backend environment configuration. Includes `MockDeterministicProvider` for deterministic offline verification and fallback.
+- **Server-Side Evidence Citation Validation:** Strictly enforces that all supporting trace steps and line numbers cited in the AI hypothesis actually exist in the container trace. Hallucinated step citations are automatically filtered with transparent diagnostic notices (zero hallucinations).
+- **Sandbox Fix Verification:** Proposed code corrections are safely executed inside disposable Docker runner containers (`POST /api/investigation/verify-fix`) and checked against expected behavior with the required disclaimer: *"Passing observed checks verifies behavior for tested inputs but does not prove universal algorithm correctness."*
+- **Prompt-Injection Defense:** Untrusted student code comments, string literals, and student intent strings are bounded by robust delimiter fences (`<<<STUDENT_CODE_UNTRUSTED>>>`) to prevent instruction overriding or secret exfiltration.
+- **Interactive Multi-Tab Learning Challenges:** Generates 3-stage post-diagnostic challenges (Trace Prediction, Conceptual Comprehension, and Targeted Coding Exercises) with interactive option checking and explanations.
+- **14-Case Evaluation Benchmark:** Comprehensive test suite covering 12 distinct bug archetypes (accumulator overwrite, off-by-one, loop termination, relational invert, integer division truncation, mutable default aliasing, missing return, recursion base case, unhandled exceptions) plus 2 ambiguous/insufficient trace cases.
+- **Comprehensive Automated Test Harness (79 Tests Passing):**
+  - 46 Pytest backend integration, evaluation benchmark, and prompt-injection tests
+  - 19 Vitest frontend unit tests
+  - 14 Playwright E2E browser tests (Desktop & Mobile Chrome)
   - 0 TypeScript compiler errors under `strict: true`
 
 ---

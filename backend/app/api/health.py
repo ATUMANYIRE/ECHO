@@ -28,7 +28,7 @@ async def get_health() -> HealthResponse:
         timestamp=datetime.now(timezone.utc),
         sandbox_available=docker_ready,
         execution_enabled=docker_ready,
-        milestone="Milestone 3: Interactive Timeline & Variable State Inspection",
+        milestone="Milestone 4: Evidence-Grounded Gemini AI Investigator",
         message=(
             "ECHO API is operational. Isolated Docker execution runner is active."
             if docker_ready

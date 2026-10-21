@@ -2,7 +2,16 @@
  * Typed API Client for ECHO backend services.
  */
 
-import { HealthResponse, ExecutionRequest, ExecutionResponse } from "./types";
+import {
+  HealthResponse,
+  ExecutionRequest,
+  ExecutionResponse,
+  InvestigationRequest,
+  InvestigationResponse,
+  FixVerificationRequest,
+  FixVerificationResponse,
+  AIProviderStatus,
+} from "./types";
 
 const getApiBaseUrl = (): string => {
   if (typeof window !== "undefined") {
@@ -105,5 +114,117 @@ export async function executeCode(request: ExecutionRequest): Promise<ExecutionR
     if (err instanceof ApiError) throw err;
     const msg = err instanceof Error ? err.message : "Network error executing code";
     throw new ApiError(`Execution request failed: ${msg}`, 0);
+  }
+}
+
+/**
+ * Request an evidence-grounded diagnosis from the AI investigator.
+ */
+export async function analyzeInvestigation(request: InvestigationRequest): Promise<InvestigationResponse> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/api/investigation/analyze`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorDetail = `Investigation failed (${response.status})`;
+      try {
+        const body = await response.json();
+        if (body?.detail) errorDetail = body.detail;
+      } catch {
+        // ignore
+      }
+      throw new ApiError(errorDetail, response.status);
+    }
+
+    return await response.json();
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof ApiError) throw err;
+    const msg = err instanceof Error ? err.message : "Network error generating diagnosis";
+    throw new ApiError(`Investigation request failed: ${msg}`, 0);
+  }
+}
+
+/**
+ * Safely verify an AI-suggested fix inside the disposable sandbox runner.
+ */
+export async function verifyFix(request: FixVerificationRequest): Promise<FixVerificationResponse> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/api/investigation/verify-fix`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorDetail = `Fix verification failed (${response.status})`;
+      try {
+        const body = await response.json();
+        if (body?.detail) errorDetail = body.detail;
+      } catch {
+        // ignore
+      }
+      throw new ApiError(errorDetail, response.status);
+    }
+
+    return await response.json();
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof ApiError) throw err;
+    const msg = err instanceof Error ? err.message : "Network error verifying fix";
+    throw new ApiError(`Fix verification failed: ${msg}`, 0);
+  }
+}
+
+/**
+ * Retrieve current AI provider configuration and readiness.
+ */
+export async function getAIStatus(): Promise<AIProviderStatus> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/api/investigation/status`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new ApiError(`Failed to fetch AI status (${response.status})`, response.status);
+    }
+
+    return await response.json();
+  } catch (err: unknown) {
+    if (err instanceof ApiError) throw err;
+    const msg = err instanceof Error ? err.message : "Network error fetching AI status";
+    throw new ApiError(msg, 0);
   }
 }

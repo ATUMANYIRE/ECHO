@@ -23,10 +23,14 @@ class HealthResponse(BaseModel):
         description="Whether untrusted code execution is active in this milestone",
     )
     milestone: str = Field(
-        default="Milestone 3: Interactive Timeline & Variable State Inspection",
+        default="Milestone 4: Evidence-Grounded Gemini AI Investigator",
         description="Active product milestone",
     )
     message: Optional[str] = Field(
-        default="ECHO API is operational. Isolated Docker runner & interactive timeline active.",
+        default="ECHO API is operational. Isolated Docker runner & Gemini AI investigator active.",
         description="System status message",
+    )
+    ai_provider_ready: bool = Field(
+        default=True,
+        description="Whether AI investigation engine is available",
     )

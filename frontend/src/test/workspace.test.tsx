@@ -88,6 +88,25 @@ describe("Workspace Components", () => {
     expect(handleRun).toHaveBeenCalledTimes(1);
   });
 
+  it("ControlBar enables Investigate button when canInvestigate is true", () => {
+    const handleInvestigate = vi.fn();
+    render(
+      <ControlBar
+        onRun={() => {}}
+        isRunning={false}
+        canRun={true}
+        canInvestigate={true}
+        onInvestigate={handleInvestigate}
+      />
+    );
+
+    const investigateBtn = screen.getByTestId("investigate-button");
+    expect(investigateBtn).toBeEnabled();
+
+    fireEvent.click(investigateBtn);
+    expect(handleInvestigate).toHaveBeenCalledTimes(1);
+  });
+
   it("ExecutionTimelinePane displays authoritative trace and allows stepping", () => {
     const handleSelectStep = vi.fn();
     const mockExecution: ExecutionResponse = {

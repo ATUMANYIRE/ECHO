@@ -1,9 +1,75 @@
 # ECHO — Engineering Progress & Milestone Tracking
 
-## Current Status: Milestone 3 Complete
+## Current Status: Milestone 4 Complete
 - **Date Completed:** October 21, 2026
 - **Lead Architect:** Principal Full-Stack & Security Engineer
 - **Verdict:** PASS
+
+---
+
+## Milestone 4 Implementation Checklist
+
+### 1. AI Provider Abstraction & Official Google GenAI SDK
+- [x] Integrate official `google-genai` SDK (`from google import genai`)
+- [x] Configure server-side `GEMINI_API_KEY` via `pydantic-settings`; zero secrets committed or exposed
+- [x] Model fallback priority list (`gemini-2.5-flash`, `gemini-1.5-pro`) with configurable timeouts (15s) and bounded retries
+- [x] Deterministic mock provider (`MockDeterministicProvider`) for offline evaluation and when keys are absent
+- [x] Dynamic AI provider status endpoint (`GET /api/investigation/status`)
+- [x] Distinct badging in API response and UI: `is_live_ai` vs `model_identifier`
+
+### 2. Evidence-Grounded Diagnostic API (`POST /api/investigation/analyze`)
+- [x] Strongly typed Pydantic v2 schemas (`InvestigationRequest`, `InvestigationResponse`)
+- [x] Server-side Evidence Citation Validator (`validate_evidence_citations`)
+- [x] Strips hallucinated/out-of-range steps and non-existent line numbers
+- [x] Adds transparent notices to `validation_warnings` when citations are filtered
+- [x] Demotes `evidence_sufficiency` to `"insufficient"` when citations or traces are empty
+- [x] Generates root-cause hypothesis, conceptual explanation, proposed correction, and learning challenges
+
+### 3. Docker Sandbox Fix Verification (`POST /api/investigation/verify-fix`)
+- [x] Executes untrusted proposed corrections strictly inside disposable Docker containers
+- [x] Assesses output against student expected behavior
+- [x] Mandates epistemological disclaimer: *"Passing observed checks verifies behavior for tested inputs but does not prove universal algorithm correctness."*
+- [x] Zero execution on host machine
+
+### 4. Prompt Injection Resistance
+- [x] Input delimiters (`<<<STUDENT_CODE_UNTRUSTED>>>`, `<<<EXPECTED_BEHAVIOR_UNTRUSTED>>>`, `<<<EXECUTION_TRACE_DATA>>>`)
+- [x] System prompt explicitly enforces untrusted handling of code comments, strings, and expected behavior
+- [x] Tested against `# SYSTEM OVERRIDE`, variable leak attempts, and instruction injection
+
+### 5. 14-Case Evaluation Benchmark (`test_ai_evaluation.py`)
+- [x] 12 Bug Categories tested and passing:
+  1. Accumulator Overwrite (`total = score`)
+  2. Off-by-one Boundary (`range(len(items) + 1)`)
+  3. Loop Condition (`while count > 0`)
+  4. Relational Operator Inversion (`<` vs `>`)
+  5. Integer Division Truncation (`//` vs `/`)
+  6. Mutable Default / Aliasing
+  7. Missing Function Return (`None`)
+  8. Recursion Base Case Missing
+  9. Unhandled IndexError
+  10. Unhandled KeyError
+  11. Unhandled ZeroDivisionError
+  12. Intent Violation (Clean run, wrong business outcome)
+- [x] 2 Edge Cases tested and passing:
+  13. Ambiguous Intent (correctly flags `ambiguous`)
+  14. Insufficient Trace Evidence (correctly flags `insufficient`)
+
+### 6. Interactive Frontend AI Investigation Experience
+- [x] "Investigate with AI" button in `ControlBar.tsx` with loading state
+- [x] AI Diagnosis tab in `ExecutionTimelinePane.tsx` with dedicated `InvestigationPane.tsx`
+- [x] Root-Cause Hypothesis card with model badge and sufficiency badge
+- [x] Clickable evidence citation step pills (e.g., `Step #2`) jumping timeline scrubber and highlighting editor lines without tab jumping
+- [x] Proposed correction with diff viewer
+- [x] "Verify Fix in Sandbox" action with live Docker container execution and disclaimer banner
+- [x] "Apply to Editor" action updating editor code
+- [x] Multi-tab Learning Challenges: Prediction question, Conceptual comprehension question, Coding challenge with interactive selection and explanations
+
+### 7. Automated Test Verification
+- [x] Backend tests: 46/46 tests passing (pytest)
+- [x] Frontend unit tests: 19/19 tests passing (vitest)
+- [x] TypeScript strict type-check: 0 errors (`tsc --noEmit`)
+- [x] Playwright E2E browser tests: 14/14 tests passing across Desktop and Mobile Chrome
+- [x] Visual artifacts captured: `desktop-investigation-m4.png` and `mobile-investigation-m4.png`
 
 ---
 

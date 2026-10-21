@@ -32,8 +32,8 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
               <span className="text-[10px] font-medium tracking-wide uppercase px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200/60">
                 GLITCHATHON 2026
               </span>
-              <span className="hidden sm:inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">
-                Milestone 3: Interactive Timeline
+              <span className="hidden sm:inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">
+                Milestone 4: Evidence-Grounded AI
               </span>
             </div>
             <p className="text-[11px] text-zinc-500 hidden md:block">

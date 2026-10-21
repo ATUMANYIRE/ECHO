@@ -130,3 +130,71 @@ export interface PredictionChallenge {
   correct_option_index: number;
   explanation: string;
 }
+
+/** Milestone 4 Evidence-Grounded AI Investigation Models */
+
+export type ChallengeType = "prediction" | "conceptual" | "coding";
+export type EvidenceSufficiency = "sufficient" | "ambiguous" | "insufficient";
+
+export interface LearningChallenge {
+  id: string;
+  challenge_type: ChallengeType;
+  question: string;
+  code_context?: string | null;
+  options?: string[] | null;
+  correct_answer: string;
+  explanation: string;
+  hint: string;
+}
+
+export interface InvestigationRequest {
+  code: string;
+  expected_behavior: string;
+  execution: ExecutionResponse;
+  comparison_execution?: ExecutionResponse | null;
+}
+
+export interface InvestigationResponse {
+  investigation_id: string;
+  observed_behavior: string;
+  expected_behavior: string;
+  root_cause_hypothesis: string;
+  explanation: string;
+  supporting_step_indices: number[];
+  relevant_lines: number[];
+  suggested_correction: string;
+  correction_rationale: string;
+  confidence_assessment: string;
+  evidence_sufficiency: EvidenceSufficiency;
+  learning_challenges: LearningChallenge[];
+  is_live_ai: boolean;
+  model_identifier: string;
+  latency_ms: number;
+  validation_warnings: string[];
+}
+
+export interface FixVerificationRequest {
+  original_code: string;
+  suggested_code: string;
+  expected_behavior: string;
+}
+
+export interface FixVerificationResponse {
+  is_verified: boolean;
+  status: string;
+  original_output: string;
+  verified_output: string;
+  matches_expectation: boolean;
+  verification_summary: string;
+  execution: ExecutionResponse;
+  disclaimer: string;
+}
+
+export interface AIProviderStatus {
+  is_configured: boolean;
+  is_available: boolean;
+  provider_name: string;
+  configured_model: string;
+  active_model: string;
+  message: string;
+}

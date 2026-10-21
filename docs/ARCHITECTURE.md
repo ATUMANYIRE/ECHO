@@ -120,3 +120,40 @@ Detailed in [`docs/SECURITY.md`](file:///E:/Projects/ECHO/docs/SECURITY.md):
   - Final terminal output values.
   - Runtime exception events.
 - Evaluates student predictions deterministically against container trace facts without relying on simulated AI responses.
+
+---
+
+## 7. Milestone 4: Evidence-Grounded Gemini AI Investigator
+
+### 7.1 Provider Abstraction & Official Google GenAI SDK (`backend/app/services/ai_provider.py`)
+- **Protocol**: `AIProvider` defining `async def generate_investigation(code, expected_behavior, execution, comparison_execution) -> InvestigationResponse`.
+- **Live Implementation (`GeminiProvider`)**:
+  - Uses the official `google-genai` SDK (`from google import genai`).
+  - Reads `GEMINI_API_KEY` exclusively server-side via `pydantic-settings`.
+  - Configurable model priority (`gemini-2.5-flash`, `gemini-1.5-pro`) with timeout bounds (default 15s) and bounded retries.
+  - Enforces structured JSON output matching `InvestigationResponse` schema.
+- **Deterministic Mock Implementation (`MockDeterministicProvider`)**:
+  - Activated whenever `GEMINI_API_KEY` is omitted or in offline evaluation test environments.
+  - Generates deterministic, trace-grounded root-cause hypotheses, citations, proposed corrections, and 3-stage learning challenges.
+  - Explicitly reports `is_live_ai: False` and `model_identifier: "deterministic-evidence-engine-v1"`.
+- **Factory Pattern (`get_ai_provider`)**: Automatically initializes the live `GeminiProvider` when configured, or cleanly falls back to `MockDeterministicProvider` with clear status messaging.
+
+### 7.2 Evidence Citation Validation Engine (`backend/app/services/investigation.py`)
+To prevent LLM hallucination and ensure strict fidelity to the Core Invariant:
+1. Every supporting step cited in `supporting_step_indices` is checked against `0 <= idx < len(execution.steps)`.
+2. Every cited line in `supporting_line_numbers` is verified against the actual lines executed in the trace.
+3. Any cited step outside trace bounds is filtered out server-side, and an informative diagnostic notice is appended to `validation_warnings`.
+4. If no citations remain or the trace is empty, `evidence_sufficiency` is demoted to `"insufficient"`.
+
+### 7.3 Sandbox Fix Verification (`POST /api/investigation/verify-fix`)
+- Untrusted AI-generated corrections are never trusted blindly or executed on the host.
+- The proposed code is executed inside a disposable Docker runner container (`RunnerService.run_code`).
+- Output is verified against the student's expected behavior.
+- Mandatory Epistemological Guardrail: The API response includes the explicit disclaimer:
+  > *"Passing observed checks verifies behavior for tested inputs but does not prove universal algorithm correctness."*
+
+### 7.4 Prompt Injection Resistance
+- Student Python code, code comments, string literals, and student expected behavior text are treated as strictly untrusted user inputs.
+- Fenced with unique delimiter blocks (`<<<STUDENT_CODE_UNTRUSTED>>>`, `<<<EXPECTED_BEHAVIOR_UNTRUSTED>>>`, `<<<EXECUTION_TRACE_DATA>>>`).
+- Explicit system prompting instructs the model to ignore any instructions embedded within code comments or user intent strings.
+- Rigorously verified by test suite: comment injections (`# SYSTEM OVERRIDE`), expected behavior injections, and string literal prompt hacks fail to hijack diagnostic output or leak environment keys.

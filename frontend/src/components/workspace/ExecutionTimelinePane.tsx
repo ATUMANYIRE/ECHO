@@ -13,18 +13,21 @@ import {
   AlertTriangle,
   Loader2,
   Layers,
+  Sparkles,
 } from "lucide-react";
 import {
   TraceStep,
   ExecutionResponse,
   SampleTraceData,
   ExecutionRunRecord,
+  InvestigationResponse,
 } from "@/lib/types";
 import { ReplayControls } from "./ReplayControls";
 import { VariableEvolutionCard } from "./VariableEvolutionCard";
 import { ComparisonView } from "./ComparisonView";
 import { PredictionChallengeCard } from "./PredictionChallengeCard";
 import { CallStackView } from "./CallStackView";
+import { InvestigationPane } from "./InvestigationPane";
 import { generatePredictionChallenges } from "@/lib/timeline-analysis";
 
 interface ExecutionTimelinePaneProps {
@@ -38,9 +41,15 @@ interface ExecutionTimelinePaneProps {
   runA?: ExecutionRunRecord | null;
   runB?: ExecutionRunRecord | null;
   onSelectRun?: (run: ExecutionRunRecord) => void;
+  investigation?: InvestigationResponse | null;
+  isInvestigating?: boolean;
+  onApplyFix?: (newCode: string) => void;
+  originalCode?: string;
+  activeTab?: TimelineTab;
+  onChangeTab?: (tab: TimelineTab) => void;
 }
 
-export type TimelineTab = "timeline" | "evolution" | "compare" | "predict" | "output";
+export type TimelineTab = "timeline" | "evolution" | "compare" | "predict" | "investigate" | "output";
 
 export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
   realExecution,
@@ -53,8 +62,19 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
   runA = null,
   runB = null,
   onSelectRun,
+  investigation = null,
+  isInvestigating = false,
+  onApplyFix = () => {},
+  originalCode = "",
+  activeTab: controlledTab,
+  onChangeTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<TimelineTab>("timeline");
+  const [internalTab, setInternalTab] = useState<TimelineTab>("timeline");
+  const activeTab = controlledTab ?? internalTab;
+  const setActiveTab = (tab: TimelineTab) => {
+    setInternalTab(tab);
+    onChangeTab?.(tab);
+  };
 
   // Determine current steps and metadata
   const steps: TraceStep[] = isSampleMode
@@ -158,6 +178,22 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
           </button>
 
           <button
+            data-testid="tab-investigate-button"
+            onClick={() => setActiveTab("investigate")}
+            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
+              activeTab === "investigate"
+                ? "bg-violet-100 text-violet-800 border border-violet-300 font-semibold"
+                : "text-zinc-600 hover:bg-zinc-100"
+            }`}
+          >
+            <Sparkles className="w-3 h-3 text-violet-600" />
+            <span>AI Diagnosis</span>
+            {investigation && (
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-600 inline-block" />
+            )}
+          </button>
+
+          <button
             data-testid="output-tab-button"
             onClick={() => setActiveTab("output")}
             className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
@@ -233,6 +269,16 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
             onSelectStep(idx);
             setActiveTab("timeline");
           }}
+        />
+      ) : activeTab === "investigate" ? (
+        <InvestigationPane
+          investigation={investigation}
+          isLoading={isInvestigating}
+          onSelectStep={(idx) => {
+            onSelectStep(idx);
+          }}
+          onApplyFix={onApplyFix}
+          originalCode={originalCode}
         />
       ) : activeTab === "output" ? (
         /* Terminal Output Tab */
