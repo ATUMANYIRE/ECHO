@@ -185,7 +185,7 @@ export const InvestigationPane: React.FC<InvestigationPaneProps> = ({
           </p>
 
           {/* Observed vs Expected Summary */}
-          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
             <div className="p-2 bg-zinc-50 border border-zinc-200 rounded">
               <span className="font-semibold text-zinc-500 block mb-0.5 text-[10px] uppercase">
                 Observed Runtime Behavior

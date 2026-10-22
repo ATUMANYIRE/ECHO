@@ -24,8 +24,8 @@ export const ControlBar: React.FC<ControlBarProps> = ({
 }) => {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-zinc-200/90 shadow-subtle">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 p-2 bg-white rounded-lg border border-zinc-200/90 shadow-subtle">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Run Code Button - ACTIVE */}
           <button
             data-testid="run-code-button"

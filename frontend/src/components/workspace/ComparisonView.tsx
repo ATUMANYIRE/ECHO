@@ -49,7 +49,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FCFCFA] text-xs">
         {/* Outcome Overview Cards */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Run A Summary */}
           <div
             data-testid="run-card-run-a"
@@ -127,41 +127,43 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
             Variable Trajectory Comparison
           </h4>
 
-          <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
-            <div className="grid grid-cols-12 px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[11px] font-semibold text-zinc-600">
-              <span className="col-span-3">Variable</span>
-              <span className="col-span-4">{runA.label} Trajectory</span>
-              <span className="col-span-4">{runB.label} Trajectory</span>
-              <span className="col-span-1 text-right">Diff</span>
-            </div>
+          <div className="border border-zinc-200 rounded-lg overflow-x-auto bg-white">
+            <div className="min-w-[420px]">
+              <div className="grid grid-cols-12 px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[11px] font-semibold text-zinc-600">
+                <span className="col-span-3">Variable</span>
+                <span className="col-span-4">{runA.label} Trajectory</span>
+                <span className="col-span-4">{runB.label} Trajectory</span>
+                <span className="col-span-1 text-right">Diff</span>
+              </div>
 
-            <div className="divide-y divide-zinc-100">
-              {comparison.variableDiffs.map((diff) => (
-                <div
-                  key={diff.variableName}
-                  data-testid={`diff-row-${diff.variableName}`}
-                  className={`grid grid-cols-12 px-3 py-2 items-center text-xs ${
-                    diff.isDifferent ? "bg-amber-50/30" : ""
-                  }`}
-                >
-                  <div className="col-span-3 font-mono font-semibold text-zinc-800">
-                    {diff.variableName}
+              <div className="divide-y divide-zinc-100">
+                {comparison.variableDiffs.map((diff) => (
+                  <div
+                    key={diff.variableName}
+                    data-testid={`diff-row-${diff.variableName}`}
+                    className={`grid grid-cols-12 px-3 py-2 items-center text-xs ${
+                      diff.isDifferent ? "bg-amber-50/30" : ""
+                    }`}
+                  >
+                    <div className="col-span-3 font-mono font-semibold text-zinc-800">
+                      {diff.variableName}
+                    </div>
+                    <div className="col-span-4 font-mono text-[11px] text-zinc-600 truncate">
+                      {diff.historyA.join(" → ") || "<none>"}
+                    </div>
+                    <div className="col-span-4 font-mono text-[11px] text-emerald-800 font-medium truncate">
+                      {diff.historyB.join(" → ") || "<none>"}
+                    </div>
+                    <div className="col-span-1 text-right">
+                      {diff.isDifferent ? (
+                        <span className="inline-block w-2 h-2 rounded-full bg-amber-500" title="Different trajectories" />
+                      ) : (
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" title="Identical trajectories" />
+                      )}
+                    </div>
                   </div>
-                  <div className="col-span-4 font-mono text-[11px] text-zinc-600 truncate">
-                    {diff.historyA.join(" → ") || "<none>"}
-                  </div>
-                  <div className="col-span-4 font-mono text-[11px] text-emerald-800 font-medium truncate">
-                    {diff.historyB.join(" → ") || "<none>"}
-                  </div>
-                  <div className="col-span-1 text-right">
-                    {diff.isDifferent ? (
-                      <span className="inline-block w-2 h-2 rounded-full bg-amber-500" title="Different trajectories" />
-                    ) : (
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" title="Identical trajectories" />
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
