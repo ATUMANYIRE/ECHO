@@ -10,10 +10,11 @@
 ## Milestone 4 Implementation Checklist
 
 ### 1. AI Provider Abstraction & Official Google GenAI SDK
-- [x] Integrate official `google-genai` SDK (`from google import genai`)
+- [x] Integrate official `google-genai` SDK v2.32.0 (`from google import genai`)
 - [x] Configure server-side `GEMINI_API_KEY` via `pydantic-settings`; zero secrets committed or exposed
-- [x] Model fallback priority list (`gemini-2.5-flash`, `gemini-1.5-pro`) with configurable timeouts (15s) and bounded retries
-- [x] Deterministic mock provider (`MockDeterministicProvider`) for offline evaluation and when keys are absent
+- [x] Verified live Google Gemini connectivity with active working model `gemini-3.5-flash-lite`
+- [x] Model candidate fallback chain (`gemini-3.5-flash-lite`, `gemini-3.5-flash`, `gemini-3.6-flash`, `gemini-flash-lite-latest`) with configurable timeouts (20s) and bounded retries
+- [x] Deterministic mock provider (`MockDeterministicProvider`) for offline evaluation and quota preservation
 - [x] Dynamic AI provider status endpoint (`GET /api/investigation/status`)
 - [x] Distinct badging in API response and UI: `is_live_ai` vs `model_identifier`
 

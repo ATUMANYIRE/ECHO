@@ -1,16 +1,19 @@
 """Application configuration management using Pydantic Settings."""
 
+from pathlib import Path
 from typing import List, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import json
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
     """Central application configuration loaded from environment and defaults."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(_BACKEND_DIR / ".env", ".env", "backend/.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -30,17 +33,17 @@ class Settings(BaseSettings):
 
     # LLM Settings (Milestone 4 - server side only)
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-3.5-flash-lite", alias="GEMINI_MODEL")
     gemini_timeout_seconds: float = Field(default=20.0, alias="GEMINI_TIMEOUT_SECONDS")
     gemini_max_retries: int = Field(default=2, alias="GEMINI_MAX_RETRIES")
     gemini_fallback_models: List[str] = Field(
-        default=["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+        default=["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-lite-latest"],
         alias="GEMINI_FALLBACK_MODELS"
     )
 
     # Execution Sandbox Settings (Milestone 2)
     runner_image: str = Field(default="echo-runner:latest", alias="RUNNER_IMAGE")
-    execution_timeout_seconds: float = Field(default=5.0, alias="EXECUTION_TIMEOUT_SECONDS")
+    execution_timeout_seconds: float = Field(default=8.0, alias="EXECUTION_TIMEOUT_SECONDS")
     execution_max_memory_mb: int = Field(default=128, alias="EXECUTION_MAX_MEMORY_MB")
     execution_max_steps: int = Field(default=500, alias="EXECUTION_MAX_STEPS")
     max_concurrent_executions: int = Field(default=5, alias="MAX_CONCURRENT_EXECUTIONS")

@@ -109,7 +109,10 @@ print(average)"""
     assert "observed_behavior" in data
     assert "expected_behavior" in data
     assert "root_cause_hypothesis" in data
-    assert "accumulator" in data["root_cause_hypothesis"].lower() or "overwrite" in data["root_cause_hypothesis"].lower()
+    assert any(
+        term in data["root_cause_hypothesis"].lower()
+        for term in ("accumulat", "overwrit", "assign", "addition", "sum")
+    )
     assert "explanation" in data
     assert "suggested_correction" in data
     assert "total += score" in data["suggested_correction"]

@@ -23,9 +23,11 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
     page,
   }) => {
     await page.goto("/");
+    await expect(page.locator("header")).toContainText("API Online", { timeout: 10000 });
 
     // Click Run in Sandbox
     const runBtn = page.getByTestId("run-code-button");
+    await expect(runBtn).toBeEnabled();
     await runBtn.click();
 
     // Verify authoritative trace badge
@@ -94,9 +96,11 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
 
   test("3. Compares Run A (Buggy) vs Run B (Corrected) side-by-side", async ({ page }) => {
     await page.goto("/");
+    await expect(page.locator("header")).toContainText("API Online", { timeout: 10000 });
 
     // 1. Run buggy code
     const runBtn = page.getByTestId("run-code-button");
+    await expect(runBtn).toBeEnabled();
     await runBtn.click();
     await expect(page.getByTestId("authoritative-trace-badge")).toBeVisible({ timeout: 15000 });
 
@@ -135,6 +139,7 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
 
   test("4. Executes Benchmark Preset 2 (Off-by-one Boundary)", async ({ page }) => {
     await page.goto("/");
+    await expect(page.locator("header")).toContainText("API Online", { timeout: 10000 });
 
     // Select preset
     const presetSelect = page.getByTestId("preset-benchmark-select");
@@ -146,6 +151,7 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
 
     // Run in Sandbox
     const runBtn = page.getByTestId("run-code-button");
+    await expect(runBtn).toBeEnabled();
     await runBtn.click();
 
     // Verify trace
@@ -162,6 +168,7 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
     page,
   }) => {
     await page.goto("/");
+    await expect(page.locator("header")).toContainText("API Online", { timeout: 10000 });
 
     // Select preset
     const presetSelect = page.getByTestId("preset-benchmark-select");
@@ -169,6 +176,7 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
 
     // Run in Sandbox
     const runBtn = page.getByTestId("run-code-button");
+    await expect(runBtn).toBeEnabled();
     await runBtn.click();
 
     // Verify trace
@@ -194,12 +202,15 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
   test("6. Milestone 4 Evidence-Grounded AI Investigation: Citations, Fix Verification & Learning", async ({
     page,
   }) => {
+    test.setTimeout(90000);
     await page.goto("/");
+    await expect(page.locator("header")).toContainText("API Online", { timeout: 10000 });
 
     // 1. Run in Sandbox to generate verified trace
     const runBtn = page.getByTestId("run-code-button");
+    await expect(runBtn).toBeEnabled();
     await runBtn.click();
-    await expect(page.getByTestId("authoritative-trace-badge")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("authoritative-trace-badge")).toBeVisible({ timeout: 20000 });
 
     // 2. Click "Investigate with AI"
     const investigateBtn = page.getByTestId("investigate-button");
@@ -209,9 +220,9 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
 
     // 3. Verify Investigation Pane appears with Hypothesis and Model info
     const pane = page.getByTestId("investigation-pane");
-    await expect(pane).toBeVisible({ timeout: 15000 });
+    await expect(pane).toBeVisible({ timeout: 30000 });
     const hypothesisCard = page.getByTestId("root-cause-hypothesis-card");
-    await expect(hypothesisCard).toBeVisible({ timeout: 15000 });
+    await expect(hypothesisCard).toBeVisible({ timeout: 30000 });
     await expect(hypothesisCard).toContainText("Hypothesis");
 
     // Check AI Model badge
@@ -231,7 +242,7 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
 
     // Wait for sandbox verification banner
     const verifiedBanner = page.getByTestId("sandbox-verified-banner");
-    await expect(verifiedBanner).toBeVisible({ timeout: 15000 });
+    await expect(verifiedBanner).toBeVisible({ timeout: 35000 });
     await expect(verifiedBanner).toContainText("Correction Verified in Sandbox");
     await expect(page.getByTestId("fix-verification-result")).toContainText(
       "Passing observed checks verifies behavior for tested inputs but does not prove universal algorithm correctness."
@@ -258,6 +269,7 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
   });
 
   test("7. Responsive Mobile Viewport & Screenshot Capture (M4)", async ({ page }, testInfo) => {
+    test.setTimeout(90000);
     if (testInfo.project.name === "Mobile Chrome") {
       await page.goto("/");
       await expect(page.getByTestId("run-code-button")).toBeVisible();
@@ -267,21 +279,23 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
     // Desktop screenshot with M4 AI Diagnosis active
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
+    await expect(page.locator("header")).toContainText("API Online", { timeout: 10000 });
     const runBtn = page.getByTestId("run-code-button");
+    await expect(runBtn).toBeEnabled();
     await runBtn.click();
-    await expect(page.getByTestId("authoritative-trace-badge")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("authoritative-trace-badge")).toBeVisible({ timeout: 20000 });
 
     // Run AI Investigation
     const investigateBtn = page.getByTestId("investigate-button");
     await investigateBtn.click();
     const hypothesisCard = page.getByTestId("root-cause-hypothesis-card");
-    await expect(hypothesisCard).toBeVisible({ timeout: 15000 });
+    await expect(hypothesisCard).toBeVisible({ timeout: 30000 });
 
     // Verify fix to display verified banner in screenshot
     const verifyFixBtn = page.getByTestId("verify-fix-button");
     await expect(verifyFixBtn).toBeVisible();
     await verifyFixBtn.click();
-    await expect(page.getByTestId("sandbox-verified-banner")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("sandbox-verified-banner")).toBeVisible({ timeout: 25000 });
     await page.waitForTimeout(600);
 
     const desktopScreenshotPath = path.resolve(

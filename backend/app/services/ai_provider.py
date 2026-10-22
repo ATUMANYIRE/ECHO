@@ -209,11 +209,16 @@ Trace Events:
 Analyze the discrepancy and produce the required JSON response.
 """
 
-        def _generate():
+        candidate_models = [self.model_name] + [
+            m for m in settings.gemini_fallback_models if m != self.model_name
+        ]
+        active_model = self.model_name
+
+        def _generate(model_to_use: str):
             from google.genai import types
 
             response = client.models.generate_content(
-                model=self.model_name,
+                model=model_to_use,
                 contents=user_content,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
@@ -223,23 +228,31 @@ Analyze the discrepancy and produce the required JSON response.
             )
             return response.text
 
-        # Bounded retry loop for transient failures
+        # Bounded retry loop across candidate models for transient failures
+        raw_json = None
         last_error = None
-        for attempt in range(settings.gemini_max_retries + 1):
-            try:
-                loop = asyncio.get_running_loop()
-                raw_json = await asyncio.wait_for(
-                    loop.run_in_executor(None, _generate),
-                    timeout=settings.gemini_timeout_seconds,
-                )
+        for model_cand in candidate_models:
+            for attempt in range(settings.gemini_max_retries + 1):
+                try:
+                    loop = asyncio.get_running_loop()
+                    raw_json = await asyncio.wait_for(
+                        loop.run_in_executor(None, _generate, model_cand),
+                        timeout=settings.gemini_timeout_seconds,
+                    )
+                    active_model = model_cand
+                    break
+                except Exception as e:
+                    last_error = e
+                    logger.warning(
+                        "Gemini API model %s attempt %d failed: %s",
+                        model_cand,
+                        attempt + 1,
+                        e,
+                    )
+                    if attempt < settings.gemini_max_retries:
+                        await asyncio.sleep(1.0 * (2**attempt))
+            if raw_json is not None:
                 break
-            except Exception as e:
-                last_error = e
-                logger.warning(
-                    "Gemini API attempt %d failed: %s", attempt + 1, e
-                )
-                if attempt < settings.gemini_max_retries:
-                    await asyncio.sleep(1.0 * (2**attempt))
         else:
             raise RuntimeError(f"Gemini API call failed after retries: {last_error}")
 
@@ -286,7 +299,7 @@ Analyze the discrepancy and produce the required JSON response.
             evidence_sufficiency=EvidenceSufficiency(parsed.get("evidence_sufficiency", "sufficient")),
             learning_challenges=challenges,
             is_live_ai=True,
-            model_identifier=self.model_name,
+            model_identifier=active_model,
             latency_ms=round(latency, 2),
         )
 

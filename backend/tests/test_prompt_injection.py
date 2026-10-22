@@ -2,7 +2,24 @@
 
 import pytest
 from httpx import AsyncClient
+from app.api.investigation import get_investigation_service
+from app.main import app
 from app.schemas.execution import ExecutionResponse, ExecutionStatus, TraceStep, VariableSnapshot
+from app.services.ai_provider import MockDeterministicProvider
+from app.services.investigation import InvestigationService
+from app.services.sandbox import SandboxService
+
+
+@pytest.fixture(autouse=True)
+def override_mock_investigation_service():
+    """Ensure prompt injection test verifies delimiter defense deterministically."""
+    sandbox = SandboxService()
+    svc = InvestigationService(sandbox_service=sandbox)
+    svc.provider = MockDeterministicProvider()
+    svc.is_live_configured = False
+    app.dependency_overrides[get_investigation_service] = lambda: svc
+    yield
+    app.dependency_overrides.pop(get_investigation_service, None)
 
 
 @pytest.fixture
