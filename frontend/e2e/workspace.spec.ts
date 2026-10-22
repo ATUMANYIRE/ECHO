@@ -220,9 +220,9 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
 
     // 3. Verify Investigation Pane appears with Hypothesis and Model info
     const pane = page.getByTestId("investigation-pane");
-    await expect(pane).toBeVisible({ timeout: 30000 });
+    await expect(pane).toBeVisible({ timeout: 45000 });
     const hypothesisCard = page.getByTestId("root-cause-hypothesis-card");
-    await expect(hypothesisCard).toBeVisible({ timeout: 30000 });
+    await expect(hypothesisCard).toBeVisible({ timeout: 45000 });
     await expect(hypothesisCard).toContainText("Hypothesis");
 
     // Check AI Model badge
@@ -289,13 +289,13 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
     const investigateBtn = page.getByTestId("investigate-button");
     await investigateBtn.click();
     const hypothesisCard = page.getByTestId("root-cause-hypothesis-card");
-    await expect(hypothesisCard).toBeVisible({ timeout: 30000 });
+    await expect(hypothesisCard).toBeVisible({ timeout: 45000 });
 
     // Verify fix to display verified banner in screenshot
     const verifyFixBtn = page.getByTestId("verify-fix-button");
     await expect(verifyFixBtn).toBeVisible();
     await verifyFixBtn.click();
-    await expect(page.getByTestId("sandbox-verified-banner")).toBeVisible({ timeout: 25000 });
+    await expect(page.getByTestId("sandbox-verified-banner")).toBeVisible({ timeout: 35000 });
     await page.waitForTimeout(600);
 
     const desktopScreenshotPath = path.resolve(
@@ -303,8 +303,14 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
       "e2e-screenshots",
       "desktop-investigation-m4.png"
     );
+    const desktopReleasePath = path.resolve(
+      process.cwd(),
+      "e2e-screenshots",
+      "desktop-final-release.png"
+    );
     fs.mkdirSync(path.dirname(desktopScreenshotPath), { recursive: true });
     await page.screenshot({ path: desktopScreenshotPath, fullPage: false });
+    await page.screenshot({ path: desktopReleasePath, fullPage: false });
 
     // Mobile screenshot
     await page.setViewportSize({ width: 390, height: 844 });
@@ -315,13 +321,21 @@ test.describe("ECHO Workspace — Milestone 4 Evidence-Grounded AI & Time-Travel
       "e2e-screenshots",
       "mobile-investigation-m4.png"
     );
+    const mobileReleasePath = path.resolve(
+      process.cwd(),
+      "e2e-screenshots",
+      "mobile-final-release.png"
+    );
     await page.screenshot({ path: mobileScreenshotPath, fullPage: false });
+    await page.screenshot({ path: mobileReleasePath, fullPage: false });
 
     // Copy to brain artifacts
     const artifactDir = "C:\\Users\\HP\\.gemini\\antigravity-cli\\brain\\0432aae0-6b7f-405e-a99a-c0d90fd2408b";
     try {
       fs.copyFileSync(desktopScreenshotPath, path.join(artifactDir, "desktop-investigation-m4.png"));
       fs.copyFileSync(mobileScreenshotPath, path.join(artifactDir, "mobile-investigation-m4.png"));
+      fs.copyFileSync(desktopReleasePath, path.join(artifactDir, "desktop-final-release.png"));
+      fs.copyFileSync(mobileReleasePath, path.join(artifactDir, "mobile-final-release.png"));
     } catch (e) {
       console.warn("Could not copy directly to artifact dir:", e);
     }

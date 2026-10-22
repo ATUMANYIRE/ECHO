@@ -165,3 +165,52 @@
 - [x] TypeScript strict type-check: 0 errors
 - [x] Playwright E2E browser tests: 10/10 tests passing
 - [x] Acceptance demonstration script (`scripts/acceptance-demo.py`): verified live output `33.333333333333336` and `80.0`
+
+---
+
+## Milestone 4: Evidence-Grounded Gemini AI Investigator (Complete)
+
+### 1. Official Google GenAI Provider & Adapters
+- [x] Official `google-genai` SDK provider (`backend/app/services/ai_provider.py`)
+- [x] Multi-candidate fallback engine (`gemini-3.5-flash-lite` -> `gemini-3.5-flash` -> `gemini-3.6-flash`)
+- [x] Deterministic mock fallback provider for offline execution and zero-quota resilience
+- [x] Bounded timeouts and retries via `pydantic-settings`
+- [x] Prompt-injection delimitation fences (`<<<STUDENT_CODE_UNTRUSTED>>>`)
+
+### 2. Evidence Citation & Fix Verification
+- [x] Server-side citation validator cross-referencing AI claims against verified trace steps
+- [x] Filter hallucinated step indices and lines with diagnostic warnings
+- [x] Sandbox fix verification endpoint (`POST /api/investigation/verify-fix`)
+- [x] Interactive multi-tier learning challenges (Trace Prediction, Conceptual Comprehension, Targeted Coding Practice)
+
+---
+
+## Milestone 5: Final Release, Product QA & GLITCHATHON Submission (Complete)
+
+### 1. Independent Engineering Audit & Bug Fixes
+- [x] Full audit of frontend/backend integration, Docker isolation, and replay state machines
+- [x] Fixed LLM suggested fix formatting to guarantee complete runnable programs
+- [x] Optimized candidate model fallback loop to handle Google API 503 transient spikes
+- [x] Realigned timeout assertions in `test_sandbox_execution.py` with 8.0s sandbox budget
+- [x] Enhanced timeline empty state with guided 3-step student workflow
+
+### 2. Live AI Evaluation Across 5 Unseen Scenarios
+- [x] UNSEEN-01 (Logical / Discount formula): 100% valid citations, verified output `Total: 45.0`
+- [x] UNSEEN-02 (Runtime exception / ZeroDivisionError): 100% valid citations, verified output `Error: Elapsed hours cannot be zero.`
+- [x] UNSEEN-03 (Function return bug / Early return): 100% valid citations, verified output `Evens: 4`
+- [x] UNSEEN-04 (Mutable state / Aliased 2D list): 100% valid citations, verified output `[[9, 0, 0], [0, 0, 0], [0, 0, 0]]`
+- [x] UNSEEN-05 (Ambiguous intent / Vague description): 100% valid citations, verified output `60`
+- [x] Live evaluation results persisted to `live_evaluation_results.json`
+
+### 3. Submission Documentation Package
+- [x] `docs/FINAL_RELEASE_REPORT.md`: Comprehensive engineering audit, live evaluation data, security boundaries, and verdict
+- [x] `docs/DEMO_SCRIPT.md`: Sub-3-minute video presentation script with precise visual cues and narration
+- [x] `docs/DEVPOST_SUBMISSION.md`: Full Devpost narrative (Inspiration, Features, Architecture, Challenges, Accomplishments)
+- [x] `docs/SUBMISSION_CHECKLIST.md`: Pre-submission verification checklist and human manual action items
+
+### 4. Verification & Release Verdict
+- [x] Backend tests: 46 / 46 passed (Pytest)
+- [x] Frontend unit tests: 19 / 19 passed (Vitest)
+- [x] Playwright E2E browser tests: 14 / 14 passed (Desktop Chrome 7/7, Mobile Chrome 7/7)
+- [x] Production build: Next.js build succeeded (106 kB First Load JS)
+- [x] Final Release Verdict: **CONDITIONAL GO** (Awaiting video upload and Devpost link)

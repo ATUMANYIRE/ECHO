@@ -5,6 +5,7 @@ import asyncio
 import shutil
 from unittest.mock import patch
 from httpx import AsyncClient
+from app.config import settings
 from app.services.sandbox import sandbox_service
 
 
@@ -195,8 +196,8 @@ async def test_infinite_loop_timeout(async_client: AsyncClient):
     data = response.json()
     assert data["status"] == "timeout"
     assert "timed out" in data["error_message"].lower()
-    # Must terminate reasonably close to timeout
-    assert elapsed <= 7.0
+    # Must terminate reasonably close to configured timeout
+    assert elapsed <= settings.execution_timeout_seconds + 3.0
 
 
 @pytest.mark.asyncio

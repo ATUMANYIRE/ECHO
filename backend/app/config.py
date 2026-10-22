@@ -34,8 +34,8 @@ class Settings(BaseSettings):
     # LLM Settings (Milestone 4 - server side only)
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="gemini-3.5-flash-lite", alias="GEMINI_MODEL")
-    gemini_timeout_seconds: float = Field(default=20.0, alias="GEMINI_TIMEOUT_SECONDS")
-    gemini_max_retries: int = Field(default=2, alias="GEMINI_MAX_RETRIES")
+    gemini_timeout_seconds: float = Field(default=8.0, alias="GEMINI_TIMEOUT_SECONDS")
+    gemini_max_retries: int = Field(default=1, alias="GEMINI_MAX_RETRIES")
     gemini_fallback_models: List[str] = Field(
         default=["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-lite-latest"],
         alias="GEMINI_FALLBACK_MODELS"

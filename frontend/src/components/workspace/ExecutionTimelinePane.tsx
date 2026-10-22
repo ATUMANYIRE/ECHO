@@ -14,6 +14,7 @@ import {
   Loader2,
   Layers,
   Sparkles,
+  Play,
 } from "lucide-react";
 import {
   TraceStep,
@@ -400,12 +401,28 @@ export const ExecutionTimelinePane: React.FC<ExecutionTimelinePaneProps> = ({
                 </p>
               </div>
             ) : totalSteps === 0 && !isLoading ? (
-              <div className="p-8 text-center text-zinc-500">
-                <Layers className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
-                <h4 className="text-xs font-semibold text-zinc-700">Ready to execute</h4>
-                <p className="text-[11px] text-zinc-400 mt-1 max-w-xs mx-auto">
-                  Click &quot;Run in Sandbox&quot; to execute your Python code and view real-time traces.
+              <div data-testid="timeline-empty-state" className="py-8 px-4 text-center text-zinc-500 max-w-sm mx-auto">
+                <div className="w-11 h-11 rounded-xl bg-brand-50 border border-brand-200 text-brand-600 flex items-center justify-center mx-auto mb-3 shadow-subtle">
+                  <Play className="w-5 h-5 fill-brand-600 ml-0.5 text-brand-600" />
+                </div>
+                <h4 className="text-xs font-semibold text-zinc-800">Ready to Trace Execution</h4>
+                <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
+                  ECHO records real container execution events so you can step backward and forward in time.
                 </p>
+                <div className="mt-4 p-3 rounded-lg bg-white border border-zinc-200/90 text-left space-y-2 text-[11px] shadow-sm">
+                  <div className="flex items-center gap-2 text-zinc-700">
+                    <span className="w-4 h-4 rounded-full bg-brand-100 text-brand-800 font-bold flex items-center justify-center text-[10px] flex-shrink-0">1</span>
+                    <span>Click <strong>Run in Sandbox</strong> to capture runtime events</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-zinc-700">
+                    <span className="w-4 h-4 rounded-full bg-brand-100 text-brand-800 font-bold flex items-center justify-center text-[10px] flex-shrink-0">2</span>
+                    <span>Scrub the <strong>Timeline</strong> to observe variable mutations</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-zinc-700">
+                    <span className="w-4 h-4 rounded-full bg-brand-100 text-brand-800 font-bold flex items-center justify-center text-[10px] flex-shrink-0">3</span>
+                    <span>Click <strong>Investigate with AI</strong> to locate divergence</span>
+                  </div>
+                </div>
               </div>
             ) : currentStep ? (
               <div

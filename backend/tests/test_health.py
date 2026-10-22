@@ -18,8 +18,9 @@ async def test_health_endpoint_api_path(async_client: AsyncClient):
     assert data["uptime_seconds"] >= 0.0
     assert "sandbox_available" in data
     assert isinstance(data["sandbox_available"], bool)
-    assert data["execution_enabled"] is True  # Milestone 4 active
+    assert data["execution_enabled"] is True  # Milestone 4/5 active
     assert "Milestone 4" in data["milestone"]
+    assert "Milestone 5" in data["milestone"]
     assert "message" in data
 
 

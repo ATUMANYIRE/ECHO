@@ -60,7 +60,7 @@ async def root():
         content={
             "app": settings.app_name,
             "version": settings.app_version,
-            "milestone": "Milestone 4: Evidence-Grounded Gemini AI Investigator",
+            "milestone": "Milestone 4 & Milestone 5: Final Competition Release & Evidence-Grounded Gemini AI Investigator",
             "tagline": "Don't just fix the mistake. Understand the moment it was made.",
             "health_endpoint": "/api/health",
             "documentation": "/docs",

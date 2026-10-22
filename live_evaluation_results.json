@@ -1,0 +1,186 @@
+[
+  {
+    "scenario_id": "UNSEEN-01",
+    "category": "Logical bug without exception",
+    "title": "Discount Calculation Formula (Missing Percentage Division)",
+    "model_identifier": "gemini-3.5-flash-lite",
+    "is_live_ai": true,
+    "observed_behavior": "The program printed 'Total: -450.0' instead of the expected 'Total: 45.0'.",
+    "expected_behavior": "Given subtotal 50.0 and 10% discount, should calculate 10% discount ($5.0) and print Total: 45.0",
+    "root_cause_hypothesis": "The student forgot to convert the percentage discount (10) into a decimal fraction by dividing by 100, causing the code to subtract 50 * 10 = 500 instead of 50 * 0.10 = 5.",
+    "explanation": "Looking at the runtime trace at Step #3, `total` becomes -450.0 because `subtotal * discount_pct` evaluates to `50.0 * 10`, which equals `500.0`. Subtracting this from `50.0` yields `-450.0`. To represent a percentage correctly, `discount_pct` must be divided by 100.",
+    "evidence_sufficiency": "sufficient",
+    "supporting_step_indices": [
+      3
+    ],
+    "relevant_lines": [
+      4
+    ],
+    "valid_steps": true,
+    "valid_lines": true,
+    "suggested_correction": "subtotal = 50.0\ndiscount_pct = 10\ntotal = subtotal - (subtotal * (discount_pct / 100))\nprint(f\"Total: {total}\")",
+    "correction_rationale": "Dividing discount_pct by 100 converts the integer percentage 10 into the correct decimal multiplier 0.10, ensuring the discount amount is correctly calculated as $5.0.",
+    "sandbox_verification": {
+      "is_verified": true,
+      "status": "completed",
+      "verified_output": "Total: 45.0",
+      "summary": "Verified: Suggested code executed successfully with output: 'Total: 45.0'."
+    },
+    "latencies": {
+      "execution_sec": 1.248,
+      "ai_analysis_sec": 4.027,
+      "sandbox_verify_sec": 2.185,
+      "total_sec": 7.46
+    },
+    "validation_warnings": []
+  },
+  {
+    "scenario_id": "UNSEEN-02",
+    "category": "Runtime exception",
+    "title": "Division by Zero in Rate Calculation",
+    "model_identifier": "gemini-3.5-flash-lite",
+    "is_live_ai": true,
+    "observed_behavior": "The program raised a ZeroDivisionError because elapsed_hours was set to 0.0, and division by zero was attempted on line 3.",
+    "expected_behavior": "Calculate average speed. If elapsed_hours is 0.0, handle or avoid ZeroDivisionError and print valid speed or warning.",
+    "root_cause_hypothesis": "The student attempted to divide distance by time without checking if the elapsed time (denominator) is zero.",
+    "explanation": "At step #3, line 3 attempts to execute 'speed = distance_km / elapsed_hours'. Since elapsed_hours evaluates to 0.0, Python raises a ZeroDivisionError, halting execution immediately.",
+    "evidence_sufficiency": "sufficient",
+    "supporting_step_indices": [
+      2,
+      3
+    ],
+    "relevant_lines": [
+      3
+    ],
+    "valid_steps": true,
+    "valid_lines": true,
+    "suggested_correction": "distance_km = 120.0\nelapsed_hours = 0.0\nif elapsed_hours > 0.0:\n    speed = distance_km / elapsed_hours\n    print(f\"Average speed: {speed} km/h\")\nelse:\n    print(\"Error: Elapsed hours cannot be zero.\")",
+    "correction_rationale": "Adding a conditional check to ensure elapsed_hours is greater than zero prevents the ZeroDivisionError and allows the program to handle the invalid denominator gracefully.",
+    "sandbox_verification": {
+      "is_verified": true,
+      "status": "completed",
+      "verified_output": "Error: Elapsed hours cannot be zero.",
+      "summary": "Verified: Suggested code executed successfully with output: 'Error: Elapsed hours cannot be zero.'."
+    },
+    "latencies": {
+      "execution_sec": 0.891,
+      "ai_analysis_sec": 5.554,
+      "sandbox_verify_sec": 1.903,
+      "total_sec": 8.348
+    },
+    "validation_warnings": []
+  },
+  {
+    "scenario_id": "UNSEEN-03",
+    "category": "Function return bug",
+    "title": "Early Return Inside Loop (Count Evens)",
+    "model_identifier": "gemini-3.5-flash-lite",
+    "is_live_ai": true,
+    "observed_behavior": "The function returns 1 after checking only the first element (2) because the return statement is placed inside the loop.",
+    "expected_behavior": "Count all even numbers in [2, 4, 6, 7, 8] and print Evens: 4 (currently returns 1 after first iteration).",
+    "root_cause_hypothesis": "Premature return due to incorrect indentation of the return statement inside the for loop.",
+    "explanation": "Looking at the runtime trace, step #8 shows count becomes 1, and immediately in step #9 the function returns. The return statement is indented at the same level as the if block inside the loop, meaning the function exits on the very first iteration.",
+    "evidence_sufficiency": "sufficient",
+    "supporting_step_indices": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "relevant_lines": [
+      6
+    ],
+    "valid_steps": true,
+    "valid_lines": true,
+    "suggested_correction": "def count_evens(numbers):\n    count = 0\n    for n in numbers:\n        if n % 2 == 0:\n            count += 1\n    return count\n\nitems = [2, 4, 6, 7, 8]\nresult = count_evens(items)\nprint(f\"Evens: {result}\")",
+    "correction_rationale": "Unindenting the return statement so it aligns with the for loop ensures the function finishes checking all elements before returning the final count.",
+    "sandbox_verification": {
+      "is_verified": true,
+      "status": "completed",
+      "verified_output": "Evens: 4",
+      "summary": "Verified: Suggested code executed successfully with output: 'Evens: 4'."
+    },
+    "latencies": {
+      "execution_sec": 1.163,
+      "ai_analysis_sec": 3.901,
+      "sandbox_verify_sec": 2.369,
+      "total_sec": 7.433
+    },
+    "validation_warnings": []
+  },
+  {
+    "scenario_id": "UNSEEN-04",
+    "category": "Mutable-state bug",
+    "title": "Aliased List Replication (2D Grid Mutation)",
+    "model_identifier": "gemini-3.5-flash-lite",
+    "is_live_ai": true,
+    "observed_behavior": "The execution output shows [[9, 0, 0], [9, 0, 0], [9, 0, 0]] because all three rows in the list reference the exact same list object in memory.",
+    "expected_behavior": "Create 3x3 grid with only grid[0][0] modified to 9: [[9, 0, 0], [0, 0, 0], [0, 0, 0]] instead of [[9, 0, 0], [9, 0, 0], [9, 0, 0]].",
+    "root_cause_hypothesis": "Using the multiplication operator (*) with a list containing a mutable object (another list) copies references, not the list itself, creating aliased rows.",
+    "explanation": "When you write [[0] * 3] * 3, Python creates a single inner list [0, 0, 0] and then repeats references to that exact same list three times. Modifying grid[0][0] modifies that single underlying list, which appears in all three rows.",
+    "evidence_sufficiency": "sufficient",
+    "supporting_step_indices": [
+      1,
+      2
+    ],
+    "relevant_lines": [
+      2,
+      3
+    ],
+    "valid_steps": true,
+    "valid_lines": true,
+    "suggested_correction": "grid = [[0 for _ in range(3)] for _ in range(3)]\ngrid[0][0] = 9\nprint(grid)",
+    "correction_rationale": "Using a list comprehension ensures that a new, distinct list object is created for each row, preventing unwanted aliasing.",
+    "sandbox_verification": {
+      "is_verified": true,
+      "status": "completed",
+      "verified_output": "[[9, 0, 0], [0, 0, 0], [0, 0, 0]]",
+      "summary": "Verified: Suggested code executed successfully with output: '[[9, 0, 0], [0, 0, 0], [0, 0, 0]]'."
+    },
+    "latencies": {
+      "execution_sec": 1.01,
+      "ai_analysis_sec": 5.051,
+      "sandbox_verify_sec": 2.248,
+      "total_sec": 8.309
+    },
+    "validation_warnings": []
+  },
+  {
+    "scenario_id": "UNSEEN-05",
+    "category": "Ambiguous expected behavior",
+    "title": "Vague Student Intent Description",
+    "model_identifier": "gemini-3.5-flash-lite",
+    "is_live_ai": true,
+    "observed_behavior": "The program successfully executes and prints 30, which is the sum of scores[0] (10) and scores[1] (20).",
+    "expected_behavior": "Make it work properly and do the right thing",
+    "root_cause_hypothesis": "The code currently works without errors, but if the intention was to sum all elements of the list, it only sums the first two indices.",
+    "explanation": "Execution evidence shows the script runs successfully to completion, calculating scores[0] + scores[1] to get 30. If the goal was to sum all elements in the list, a loop or sum() function should be used.",
+    "evidence_sufficiency": "sufficient",
+    "supporting_step_indices": [
+      1,
+      2
+    ],
+    "relevant_lines": [
+      1,
+      2,
+      3
+    ],
+    "valid_steps": true,
+    "valid_lines": true,
+    "suggested_correction": "scores = [10, 20, 30]\nres = sum(scores)\nprint(res)",
+    "correction_rationale": "Using the built-in sum() function correctly aggregates all elements of the list rather than manually adding specific indices.",
+    "sandbox_verification": {
+      "is_verified": true,
+      "status": "completed",
+      "verified_output": "60",
+      "summary": "Verified: Suggested code executed successfully with output: '60'."
+    },
+    "latencies": {
+      "execution_sec": 1.014,
+      "ai_analysis_sec": 3.282,
+      "sandbox_verify_sec": 1.913,
+      "total_sec": 6.209
+    },
+    "validation_warnings": []
+  }
+]

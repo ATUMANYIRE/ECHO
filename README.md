@@ -2,7 +2,8 @@
 
 > **Tagline:** *Don't just fix the mistake. Understand the moment it was made.*  
 > **GLITCHATHON 2026 Submission** | Target Deadline: October 25, 2026, 13:30 GMT+2  
-> **Current Status:** Milestone 4 Complete (Evidence-Grounded Gemini AI Investigator)
+> **Current Status:** Milestone 5 Complete — Final Competition Release Candidate (`v0.5.0-rc1`)  
+> **Release Verdict:** **CONDITIONAL GO** (100% tests passing, live Gemini validated; pending human video walkthrough & Devpost link)
 
 ---
 
@@ -135,6 +136,10 @@ Detailed specifications are maintained in [`docs/SECURITY.md`](file:///E:/Projec
 
 ## 8. Repository Documentation Index
 
+- [`docs/FINAL_RELEASE_REPORT.md`](file:///E:/Projects/ECHO/docs/FINAL_RELEASE_REPORT.md) — Comprehensive Milestone 5 audit, live 5-scenario evaluation, and verdict
+- [`docs/DEMO_SCRIPT.md`](file:///E:/Projects/ECHO/docs/DEMO_SCRIPT.md) — Under 3-minute video presentation script with visual cues
+- [`docs/DEVPOST_SUBMISSION.md`](file:///E:/Projects/ECHO/docs/DEVPOST_SUBMISSION.md) — Complete Devpost submission package and project narrative
+- [`docs/SUBMISSION_CHECKLIST.md`](file:///E:/Projects/ECHO/docs/SUBMISSION_CHECKLIST.md) — Pre-submission verification checklist and manual action items
 - [`docs/ROADMAP.md`](file:///E:/Projects/ECHO/docs/ROADMAP.md) — 5-Milestone roadmap with measurable acceptance criteria
 - [`docs/ARCHITECTURE.md`](file:///E:/Projects/ECHO/docs/ARCHITECTURE.md) — System architecture, component boundaries, and contracts
 - [`docs/SECURITY.md`](file:///E:/Projects/ECHO/docs/SECURITY.md) — Security model, threat analysis, and container sandbox specs
