@@ -4,8 +4,9 @@ import { describe, it, expect, vi } from "vitest";
 import { WorkspaceHeader } from "../components/workspace/WorkspaceHeader";
 import { CodeEditorPane } from "../components/workspace/CodeEditorPane";
 import { ExpectedBehaviorPane } from "../components/workspace/ExpectedBehaviorPane";
-import { ControlBar } from "../components/workspace/ControlBar";
-import { ExecutionTimelinePane } from "../components/workspace/ExecutionTimelinePane";
+import { ReplayPanel } from "../components/workspace/ReplayPanel";
+import { JourneyStepper } from "../components/workspace/JourneyStepper";
+import { LearnPanel } from "../components/workspace/LearnPanel";
 import { ExecutionResponse } from "../lib/types";
 
 describe("Workspace Components", () => {
@@ -29,9 +30,8 @@ describe("Workspace Components", () => {
     );
 
     expect(screen.getByText("ECHO")).toBeInTheDocument();
-    expect(screen.getByText("GLITCHATHON 2026")).toBeInTheDocument();
-    expect(screen.getByText(/API Online/i)).toBeInTheDocument();
-    expect(screen.getByText(/Sandbox: Active/i)).toBeInTheDocument();
+    expect(screen.getByTestId("backend-status-indicator")).toHaveTextContent("Connected");
+    expect(screen.queryByText(/GLITCHATHON|Milestone/i)).not.toBeInTheDocument();
   });
 
   it("CodeEditorPane renders code lines and reacts to input changes", () => {
@@ -65,46 +65,6 @@ describe("Workspace Components", () => {
 
     fireEvent.change(textarea, { target: { value: "Updated expectation" } });
     expect(handleChange).toHaveBeenCalledWith("Updated expectation");
-  });
-
-  it("ControlBar has enabled Run button in Milestone 2", () => {
-    const handleRun = vi.fn();
-    render(
-      <ControlBar
-        onRun={handleRun}
-        isRunning={false}
-        canRun={true}
-      />
-    );
-
-    const runBtn = screen.getByTestId("run-code-button");
-    const investigateBtn = screen.getByTestId("investigate-button");
-
-    expect(runBtn).toBeEnabled();
-    expect(investigateBtn).toBeDisabled();
-    expect(screen.getByText("Isolated Sandbox Active")).toBeInTheDocument();
-
-    fireEvent.click(runBtn);
-    expect(handleRun).toHaveBeenCalledTimes(1);
-  });
-
-  it("ControlBar enables Investigate button when canInvestigate is true", () => {
-    const handleInvestigate = vi.fn();
-    render(
-      <ControlBar
-        onRun={() => {}}
-        isRunning={false}
-        canRun={true}
-        canInvestigate={true}
-        onInvestigate={handleInvestigate}
-      />
-    );
-
-    const investigateBtn = screen.getByTestId("investigate-button");
-    expect(investigateBtn).toBeEnabled();
-
-    fireEvent.click(investigateBtn);
-    expect(handleInvestigate).toHaveBeenCalledTimes(1);
   });
 
   it("ExecutionTimelinePane displays authoritative trace and allows stepping", () => {
@@ -146,29 +106,59 @@ describe("Workspace Components", () => {
     };
 
     render(
-      <ExecutionTimelinePane
-        realExecution={mockExecution}
-        sampleTrace={null}
-        isSampleMode={false}
-        isLoading={false}
+      <ReplayPanel
+        execution={mockExecution}
+        code="x = 10
+y = 20"
         activeStepIndex={0}
         onSelectStep={handleSelectStep}
-        onSwitchToReal={() => {}}
+        onExplain={() => {}}
+        isInvestigating={false}
+        hasInvestigation={false}
       />
     );
 
-    // Verify authoritative badge
-    expect(screen.getByTestId("authoritative-trace-badge")).toBeInTheDocument();
-    expect(screen.getByText(/Verified Container Trace/i)).toBeInTheDocument();
-
-    // Verify next step button
-    const nextBtn = screen.getByTestId("step-next-button");
-    fireEvent.click(nextBtn);
+    fireEvent.click(screen.getByTestId("step-next-button"));
     expect(handleSelectStep).toHaveBeenCalledWith(1);
+    expect(screen.getByTestId("step-counter")).toBeInTheDocument();
+  });
 
-    // Verify terminal output tab
-    const outputTab = screen.getByTestId("output-tab-button");
-    fireEvent.click(outputTab);
-    expect(screen.getByText("output test")).toBeInTheDocument();
+  it("JourneyStepper only lets students revisit stages they have reached", () => {
+    const onNavigate = vi.fn();
+    render(
+      <JourneyStepper
+        current="explore"
+        reached={{ write: true, run: true, explore: true, understand: false, fix: false, learn: false }}
+        onNavigate={onNavigate}
+      />
+    );
+    fireEvent.click(screen.getByTestId("stage-run"));
+    expect(onNavigate).toHaveBeenCalledWith("run");
+    expect(screen.getByTestId("stage-understand").tagName).toBe("SPAN");
+  });
+
+  it("LearnPanel shows one question at a time with feedback", () => {
+    render(
+      <LearnPanel
+        isVerified
+        onBackToReplay={() => {}}
+        challenges={[
+          {
+            id: "c1",
+            challenge_type: "conceptual",
+            question: "Which operator accumulates?",
+            options: ["=", "+="],
+            correct_answer: "+=",
+            explanation: "+= adds to the existing value.",
+            hint: "Think about keeping the old value.",
+          },
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "=" }));
+    fireEvent.click(screen.getByText("Check my answer"));
+    expect(screen.getByTestId("learn-feedback")).toHaveTextContent(/not quite/i);
+    fireEvent.click(screen.getByText("Finish"));
+    expect(screen.getByTestId("learn-complete")).toBeInTheDocument();
   });
 });

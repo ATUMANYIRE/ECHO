@@ -1,26 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Sparkles,
-  ShieldCheck,
-  AlertTriangle,
   CheckCircle2,
   XCircle,
-  HelpCircle,
-  Code2,
-  Play,
   Loader2,
   ArrowRight,
-  ExternalLink,
-  Info,
+  AlertTriangle,
+  ShieldCheck,
+  GitCompare,
+  RefreshCw,
 } from "lucide-react";
-import {
-  InvestigationResponse,
-  FixVerificationResponse,
-  LearningChallenge,
-} from "@/lib/types";
+import { InvestigationResponse, FixVerificationResponse, TraceStep } from "@/lib/types";
 import { verifyFix } from "@/lib/api-client";
+import { diffLines, hasChanges } from "@/lib/code-diff";
 
 interface InvestigationPaneProps {
   investigation: InvestigationResponse | null;
@@ -28,7 +22,35 @@ interface InvestigationPaneProps {
   onSelectStep: (stepIndex: number) => void;
   onApplyFix: (newCode: string) => void;
   originalCode: string;
+  /** Recorded steps, used to describe each citation in plain words. */
+  steps?: TraceStep[];
+  /** Request failure message (shown with a retry action). */
+  error?: string | null;
+  onRetry?: () => void;
+  /** Controlled verification result (kept by the workspace for the Compare stage). */
+  verification?: FixVerificationResponse | null;
+  onVerified?: (result: FixVerificationResponse) => void;
+  onCompare?: () => void;
 }
+
+const SectionHeading: React.FC<{
+  n: number;
+  title: string;
+  children?: React.ReactNode;
+}> = ({ n, title, children }) => (
+  <div className="flex items-center justify-between gap-3 mb-2.5">
+    <h3 className="flex items-center gap-2 panel-title">
+      <span
+        aria-hidden="true"
+        className="flex items-center justify-center w-5 h-5 rounded-full bg-surface-muted text-[11px] font-medium text-text-secondary"
+      >
+        {n}
+      </span>
+      {title}
+    </h3>
+    {children}
+  </div>
+);
 
 export const InvestigationPane: React.FC<InvestigationPaneProps> = ({
   investigation,
@@ -36,462 +58,417 @@ export const InvestigationPane: React.FC<InvestigationPaneProps> = ({
   onSelectStep,
   onApplyFix,
   originalCode,
+  steps = [],
+  error = null,
+  onRetry,
+  verification,
+  onVerified,
+  onCompare,
 }) => {
-  const [isVerifying, setIsVerifying] = useState<boolean>(false);
-  const [verificationResult, setVerificationResult] =
-    useState<FixVerificationResponse | null>(null);
-  const [activeChallengeIdx, setActiveChallengeIdx] = useState<number>(0);
-  const [selectedChallengeOption, setSelectedChallengeOption] = useState<
-    string | null
-  >(null);
-  const [codingAnswer, setCodingAnswer] = useState<string>("");
-  const [challengeSubmitted, setChallengeSubmitted] = useState<boolean>(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [localVerification, setLocalVerification] = useState<FixVerificationResponse | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [applied, setApplied] = useState(false);
+
+  const result = verification ?? localVerification;
+  const diff = useMemo(
+    () => (investigation ? diffLines(originalCode, investigation.suggested_correction) : []),
+    [originalCode, investigation]
+  );
 
   if (isLoading) {
     return (
       <div
         data-testid="investigation-loading-state"
-        className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-lg border border-zinc-200 h-full"
+        role="status"
+        aria-live="polite"
+        className="fade-in px-6 py-12 max-w-[460px] mx-auto text-center"
       >
-        <Loader2 className="w-8 h-8 text-violet-600 animate-spin mb-3" />
-        <h3 className="text-sm font-semibold text-zinc-900">
-          AI Investigator Analyzing Runtime Trace...
-        </h3>
-        <p className="text-xs text-zinc-500 max-w-sm mt-1 leading-relaxed">
-          Correlating student intent with verified container execution events to
-          isolate the exact moment of divergence.
+        <Loader2 className="w-6 h-6 mx-auto text-brand-600 animate-spin" aria-hidden="true" />
+        <h2 className="mt-4 text-[15px] font-semibold text-text-primary">
+          Reading the recording…
+        </h2>
+        <p className="mt-1.5 text-[13px] leading-5 text-text-secondary">
+          Gemini is comparing what you expected with what actually happened, using the exact steps
+          ECHO recorded.
         </p>
+        <div className="mt-6 space-y-2.5" aria-hidden="true">
+          <div className="h-3 rounded bg-surface-muted animate-pulse w-11/12 mx-auto" />
+          <div className="h-3 rounded bg-surface-muted animate-pulse w-9/12 mx-auto" />
+          <div className="h-3 rounded bg-surface-muted animate-pulse w-10/12 mx-auto" />
+        </div>
       </div>
     );
   }
 
   if (!investigation) {
+    if (error) {
+      return (
+        <div
+          data-testid="investigation-error-state"
+          role="alert"
+          className="fade-in px-6 py-12 max-w-[460px] mx-auto text-center"
+        >
+          <AlertTriangle className="w-6 h-6 mx-auto text-error" aria-hidden="true" />
+          <h2 className="mt-4 text-[15px] font-semibold text-text-primary">
+            The explanation couldn&apos;t be created
+          </h2>
+          <p className="mt-1.5 text-[13px] leading-5 text-text-secondary break-words">{error}</p>
+          {onRetry && (
+            <button type="button" onClick={onRetry} className="btn btn-secondary mt-5">
+              <RefreshCw className="w-4 h-4" aria-hidden="true" />
+              Try again
+            </button>
+          )}
+        </div>
+      );
+    }
     return (
       <div
         data-testid="investigation-empty-state"
-        className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-lg border border-zinc-200 h-full"
+        className="px-6 py-12 max-w-[460px] mx-auto text-center"
       >
-        <Sparkles className="w-8 h-8 text-violet-400 mb-2" />
-        <h4 className="text-xs font-semibold text-zinc-800">
-          Evidence-Grounded AI Investigator
-        </h4>
-        <p className="text-[11px] text-zinc-400 max-w-sm mt-1 leading-relaxed">
-          Click <strong>&quot;Investigate with AI&quot;</strong> in the control bar to analyze your
-          program&apos;s runtime trace and discover why and when it diverged from intent.
+        <Sparkles className="w-6 h-6 mx-auto text-brand-600" aria-hidden="true" />
+        <h2 className="mt-4 text-[15px] font-semibold text-text-primary">No explanation yet</h2>
+        <p className="mt-1.5 text-[13px] leading-5 text-text-secondary">
+          Run your code, explore the replay, then choose “Explain with AI” to see why the result
+          differs from what you expected.
         </p>
       </div>
     );
   }
 
-  const handleVerifyFix = async () => {
+  const handleVerify = async () => {
     setIsVerifying(true);
-    setVerificationResult(null);
+    setVerifyError(null);
     try {
       const res = await verifyFix({
         original_code: originalCode,
         suggested_code: investigation.suggested_correction,
         expected_behavior: investigation.expected_behavior,
       });
-      setVerificationResult(res);
+      setLocalVerification(res);
+      onVerified?.(res);
     } catch (err) {
-      console.error("Fix verification failed:", err);
+      setVerifyError(err instanceof Error ? err.message : "Verification could not be completed.");
     } finally {
       setIsVerifying(false);
     }
   };
 
-  const challenges = investigation.learning_challenges || [];
-  const activeChallenge: LearningChallenge | undefined =
-    challenges[activeChallengeIdx];
+  const handleApply = () => {
+    onApplyFix(investigation.suggested_correction);
+    setApplied(true);
+  };
+
+  const sufficiencyLabel = {
+    sufficient: "Enough evidence",
+    ambiguous: "Evidence is ambiguous",
+    insufficient: "Not enough evidence",
+  }[investigation.evidence_sufficiency];
+
+  const codeLines = originalCode.split("\n");
+  const showDiff = hasChanges(diff);
 
   return (
-    <div
-      data-testid="investigation-pane"
-      className="flex flex-col h-full bg-white rounded-lg border border-zinc-200/90 shadow-card overflow-hidden"
-    >
-      {/* Pane Header */}
-      <div className="flex items-center justify-between px-3.5 py-2 border-b border-zinc-200/80 bg-zinc-50/70 text-xs">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-violet-600" />
-          <span className="font-semibold text-zinc-800">
-            AI Diagnosis & Evidence Trace
-          </span>
-          <span
-            data-testid="investigation-model-badge"
-            className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium border ${
-              investigation.is_live_ai
-                ? "bg-violet-50 text-violet-700 border-violet-200"
-                : "bg-zinc-100 text-zinc-600 border-zinc-200"
-            }`}
-          >
-            {investigation.is_live_ai
-              ? `Gemini (${investigation.model_identifier})`
-              : "Deterministic Engine (Verified Trace)"}
-          </span>
-        </div>
-
-        {/* Sufficiency Badge */}
+    <div data-testid="investigation-pane" className="fade-in px-4 sm:px-5 py-5 space-y-7">
+      {/* Provenance */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          data-testid="investigation-model-badge"
+          className={`chip ${investigation.is_live_ai ? "chip-ai" : "chip-neutral"}`}
+          title={
+            investigation.is_live_ai
+              ? "Generated live by the Gemini API"
+              : "Generated by ECHO's built-in rule-based fallback — not an AI model"
+          }
+        >
+          <Sparkles className="w-3 h-3" aria-hidden="true" />
+          {investigation.is_live_ai
+            ? `Gemini · ${investigation.model_identifier}`
+            : "Built-in fallback (not AI)"}
+        </span>
         <span
           data-testid="evidence-sufficiency-badge"
-          className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase ${
+          className={`chip ${
             investigation.evidence_sufficiency === "sufficient"
-              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+              ? "chip-verified"
               : investigation.evidence_sufficiency === "ambiguous"
-              ? "bg-amber-50 text-amber-800 border border-amber-200"
-              : "bg-rose-50 text-rose-800 border border-rose-200"
+              ? "chip-warn"
+              : "chip-error"
           }`}
         >
-          {investigation.evidence_sufficiency} Evidence
+          {sufficiencyLabel}
+          <span className="sr-only"> ({investigation.evidence_sufficiency})</span>
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FCFCFA] text-xs">
-        {/* Validation Warnings (if any filtered citations) */}
-        {investigation.validation_warnings.length > 0 && (
-          <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-[11px] space-y-1">
-            <div className="flex items-center gap-1.5 font-semibold text-amber-950">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-              <span>Evidence Validation Notices</span>
-            </div>
-            {investigation.validation_warnings.map((warn, i) => (
-              <p key={i} className="text-[10px] leading-relaxed">
-                • {warn}
-              </p>
+      {investigation.validation_warnings.length > 0 && (
+        <div role="note" className="rounded-lg border border-[#F3DDB0] bg-[#FFF8EB] px-3.5 py-2.5 text-[13px]">
+          <p className="font-medium text-[#9A5B00] flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+            {investigation.is_live_ai ? "Some AI claims were removed" : "Gemini wasn’t available, so this is a rule-based explanation"}
+          </p>
+          <ul className="mt-1 space-y-0.5 text-text-secondary">
+            {investigation.validation_warnings.map((w, i) => (
+              <li key={i}>{w.replace(/\s*\(Gemini API call failed[^)]*\)\.?/, "").replace(/\s+\./g, ".")}</li>
             ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 1. What happened */}
+      <section aria-label="What happened">
+        <SectionHeading n={1} title="What happened">
+          <span className="chip chip-verified">
+            <ShieldCheck className="w-3 h-3" aria-hidden="true" />
+            Verified from the run
+          </span>
+        </SectionHeading>
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="rounded-lg bg-surface-subtle border border-border px-3 py-2.5 min-w-0">
+            <p className="eyebrow mb-1">Actual behavior</p>
+            <p className="font-mono text-[12.5px] leading-5 break-words text-text-primary">
+              {investigation.observed_behavior}
+            </p>
           </div>
-        )}
-
-        {/* Root-Cause Hypothesis Card */}
-        <div
-          data-testid="root-cause-hypothesis-card"
-          className="p-3.5 bg-white border border-violet-200 rounded-lg shadow-subtle space-y-2.5"
-        >
-          <div className="flex items-center justify-between pb-1.5 border-b border-violet-100">
-            <span className="font-semibold text-violet-950 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-              <span>Root-Cause Hypothesis</span>
-            </span>
-            <span className="text-[10px] text-zinc-400 font-mono">
-              Hypothesis (Evidence-Grounded)
-            </span>
-          </div>
-
-          <p className="text-zinc-900 font-medium text-xs leading-relaxed bg-violet-50/50 p-2.5 rounded border border-violet-100">
-            {investigation.root_cause_hypothesis}
-          </p>
-
-          <p className="text-zinc-600 leading-relaxed text-[11px]">
-            {investigation.explanation}
-          </p>
-
-          {/* Observed vs Expected Summary */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
-            <div className="p-2 bg-zinc-50 border border-zinc-200 rounded">
-              <span className="font-semibold text-zinc-500 block mb-0.5 text-[10px] uppercase">
-                Observed Runtime Behavior
-              </span>
-              <span className="font-mono text-zinc-800">
-                {investigation.observed_behavior}
-              </span>
-            </div>
-            <div className="p-2 bg-emerald-50/50 border border-emerald-200 rounded">
-              <span className="font-semibold text-emerald-700 block mb-0.5 text-[10px] uppercase">
-                Expected Intent
-              </span>
-              <span className="font-mono text-emerald-900">
-                {investigation.expected_behavior || "(Unspecified)"}
-              </span>
-            </div>
+          <div className="rounded-lg bg-brand-50 border border-brand-200 px-3 py-2.5 min-w-0">
+            <p className="eyebrow mb-1">You expected</p>
+            <p className="text-[13px] leading-5 break-words text-text-primary">
+              {investigation.expected_behavior || "(not specified)"}
+            </p>
           </div>
         </div>
+      </section>
 
-        {/* Supporting Evidence Citations (Clickable Step & Line Pills) */}
-        <div
-          data-testid="evidence-citations-card"
-          className="p-3 bg-white border border-zinc-200 rounded-lg space-y-2"
-        >
-          <div className="font-semibold text-zinc-800 text-[11px] flex items-center justify-between">
-            <span>Supporting Trace Evidence</span>
-            <span className="text-[10px] text-zinc-400">
-              Click a pill to jump directly to that moment
-            </span>
-          </div>
+      {/* 2. Why it happened */}
+      <section aria-label="Why it happened" data-testid="root-cause-hypothesis-card">
+        <SectionHeading n={2} title="Why it happened">
+          <span className={`chip ${investigation.is_live_ai ? "chip-ai" : "chip-neutral"}`}>
+            {investigation.is_live_ai ? "AI hypothesis" : "Rule-based hypothesis"}
+          </span>
+        </SectionHeading>
+        <p className="text-[14.5px] leading-6 font-medium text-text-primary">
+          {investigation.root_cause_hypothesis}
+        </p>
+        <p className="mt-2 text-[13.5px] leading-6 text-text-secondary">{investigation.explanation}</p>
+        <p className="mt-2 text-xs leading-5 text-text-secondary">
+          {investigation.confidence_assessment} A hypothesis is only as good as the evidence below —
+          check it against the replay.
+        </p>
+      </section>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {investigation.supporting_step_indices.map((idx) => (
-              <button
-                key={idx}
-                data-testid={`citation-step-${idx}`}
-                onClick={() => onSelectStep(idx)}
-                className="px-2 py-1 rounded bg-brand-50 hover:bg-brand-100 text-brand-800 border border-brand-200 text-[11px] font-mono font-medium flex items-center gap-1 transition-colors"
-                title={`Jump timeline to Step #${idx + 1}`}
-              >
-                <span>Step #{idx + 1}</span>
-                <ArrowRight className="w-3 h-3 text-brand-500" />
-              </button>
-            ))}
+      {/* 3. Evidence */}
+      <section aria-label="Evidence from execution" data-testid="evidence-citations-card">
+        <SectionHeading n={3} title="Evidence from the run">
+          <span className="chip chip-verified">
+            <ShieldCheck className="w-3 h-3" aria-hidden="true" />
+            Recorded steps
+          </span>
+        </SectionHeading>
 
+        {investigation.supporting_step_indices.length === 0 && investigation.relevant_lines.length === 0 ? (
+          <p className="text-[13px] text-text-secondary">No specific steps were cited.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {investigation.supporting_step_indices.map((idx) => {
+              const step = steps[idx];
+              const src = step ? codeLines[step.line_number - 1]?.trim() : null;
+              return (
+                <li key={idx}>
+                  <button
+                    type="button"
+                    data-testid={`citation-step-${idx}`}
+                    onClick={() => onSelectStep(idx)}
+                    title={`Jump to step ${idx + 1} in the replay`}
+                    className="w-full flex items-center gap-3 rounded-lg border border-border bg-surface px-3 min-h-[40px] py-1.5 text-left hover:bg-brand-50 hover:border-brand-200 transition-colors"
+                  >
+                    <span className="font-medium text-[13px] text-brand-700 flex-shrink-0">
+                      Step {idx + 1}
+                    </span>
+                    {step && (
+                      <span className="text-xs text-text-secondary flex-shrink-0">
+                        line {step.line_number}
+                      </span>
+                    )}
+                    {src && (
+                      <code className="font-mono text-[12.5px] text-text-primary truncate min-w-0">
+                        {src}
+                      </code>
+                    )}
+                    <ArrowRight
+                      className="w-3.5 h-3.5 ml-auto text-text-secondary flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {investigation.relevant_lines.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
+            <span>Relevant lines:</span>
             {investigation.relevant_lines.map((lineNo) => (
               <span
                 key={lineNo}
                 data-testid={`citation-line-${lineNo}`}
-                className="px-2 py-1 rounded bg-zinc-100 text-zinc-700 border border-zinc-200 text-[11px] font-mono font-medium"
+                className="chip chip-neutral font-mono"
               >
                 Line {lineNo}
               </span>
             ))}
           </div>
+        )}
+      </section>
 
-          <p className="text-[10px] text-zinc-500 italic mt-1">
-            {investigation.confidence_assessment}
-          </p>
-        </div>
-
-        {/* Proposed Code Correction & Safe Verification */}
-        <div
-          data-testid="proposed-correction-card"
-          className="p-3.5 bg-white border border-zinc-200 rounded-lg space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-zinc-800 flex items-center gap-1.5">
-              <Code2 className="w-3.5 h-3.5 text-brand-600" />
-              <span>Proposed Correction</span>
+      {/* 4. Suggested correction */}
+      <section aria-label="Suggested correction" data-testid="proposed-correction-card">
+        <SectionHeading n={4} title="Suggested fix">
+          {result?.is_verified ? (
+            <span className="chip chip-verified">
+              <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+              Passed sandbox run
             </span>
-            <span className="text-[10px] text-zinc-400 font-mono">
-              Untrusted AI Code
-            </span>
-          </div>
-
-          <p className="text-[11px] text-zinc-600 leading-relaxed">
-            {investigation.correction_rationale}
-          </p>
-
-          {/* Code preview box */}
-          <div className="bg-zinc-900 text-zinc-100 p-2.5 rounded font-mono text-[11px] overflow-x-auto border border-zinc-800">
-            <pre>{investigation.suggested_correction}</pre>
-          </div>
-
-          {/* Verification Controls */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button
-              data-testid="verify-fix-button"
-              onClick={handleVerifyFix}
-              disabled={isVerifying}
-              className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-medium text-xs flex items-center gap-1.5 transition-all shadow-sm"
-              title="Execute proposed code in isolated sandbox to verify behavior"
-            >
-              {isVerifying ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                  <span>Testing in Sandbox...</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 fill-current text-white" />
-                  <span>Verify Fix in Sandbox</span>
-                </>
-              )}
-            </button>
-
-            <button
-              data-testid="apply-fix-button"
-              onClick={() => onApplyFix(investigation.suggested_correction)}
-              className="px-3 py-1.5 rounded border border-zinc-300 hover:bg-zinc-100 text-zinc-700 font-medium text-xs transition-colors"
-              title="Apply this corrected code into the editor"
-            >
-              Apply to Editor
-            </button>
-          </div>
-
-          {/* Verification Result Banner */}
-          {verificationResult && (
-            <div
-              data-testid="fix-verification-result"
-              className={`p-3 rounded-lg border text-xs space-y-1.5 ${
-                verificationResult.is_verified
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-950"
-                  : "bg-rose-50 border-rose-200 text-rose-950"
-              }`}
-            >
-              <div data-testid="sandbox-verified-banner" className="flex items-center justify-between font-semibold">
-                <div className="flex items-center gap-1.5">
-                  {verificationResult.is_verified ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-rose-600" />
-                  )}
-                  <span>
-                    {verificationResult.is_verified
-                      ? "Correction Verified in Sandbox"
-                      : "Correction Did Not Pass Sandbox Checks"}
-                  </span>
-                </div>
-                <span className="font-mono text-[10px] uppercase">
-                  {verificationResult.status}
-                </span>
-              </div>
-
-              <p className="text-[11px] leading-relaxed">
-                {verificationResult.verification_summary}
-              </p>
-
-              <div className="font-mono text-[11px] bg-white/80 p-1.5 rounded border border-emerald-200">
-                Output: <code>{verificationResult.verified_output}</code>
-              </div>
-
-              <p className="text-[10px] text-zinc-500 italic pt-1">
-                Notice: {verificationResult.disclaimer}
-              </p>
-            </div>
+          ) : (
+            <span className="chip chip-neutral">Not verified yet</span>
           )}
+        </SectionHeading>
+
+        <p className="text-[13.5px] leading-6 text-text-secondary">{investigation.correction_rationale}</p>
+
+        <div
+          className="mt-3 rounded-lg border border-border overflow-hidden"
+          role="group"
+          aria-label="Suggested code"
+        >
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-surface-subtle text-xs text-text-secondary">
+            <span>{showDiff ? "Changes to your code" : "Suggested code"}</span>
+            <span>Review before running</span>
+          </div>
+          <pre className="font-mono text-[12.5px] leading-6 overflow-x-auto py-1.5 bg-surface">
+            {(showDiff ? diff : investigation.suggested_correction.split("\n").map((t) => ({ kind: "same" as const, text: t }))).map(
+              (d, i) => (
+                <div
+                  key={i}
+                  className={`px-3 whitespace-pre ${
+                    d.kind === "added"
+                      ? "bg-success-50 text-success"
+                      : d.kind === "removed"
+                      ? "bg-error-50 text-error line-through decoration-error/40"
+                      : "text-text-primary"
+                  }`}
+                >
+                  <span aria-hidden="true" className="inline-block w-4 select-none opacity-70">
+                    {d.kind === "added" ? "+" : d.kind === "removed" ? "−" : " "}
+                  </span>
+                  <span className="sr-only">
+                    {d.kind === "added" ? "Added: " : d.kind === "removed" ? "Removed: " : ""}
+                  </span>
+                  {d.text || " "}
+                </div>
+              )
+            )}
+          </pre>
         </div>
 
-        {/* AI Learning Challenges Card */}
-        {challenges.length > 0 && activeChallenge && (
-          <div
-            data-testid="learning-challenges-card"
-            className="p-3.5 bg-white border border-zinc-200 rounded-lg space-y-3"
+        <div className="mt-3 flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            data-testid="verify-fix-button"
+            onClick={handleVerify}
+            disabled={isVerifying}
+            className="btn btn-primary"
+            title="Run the suggested code in the isolated sandbox to see what it really does"
           >
-            <div className="flex items-center justify-between pb-1.5 border-b border-zinc-200/80">
-              <span className="font-semibold text-zinc-800 flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5 text-brand-600" />
-                <span>Concept Check: Solidify Understanding</span>
-              </span>
-              <span className="text-[10px] text-zinc-400 font-mono">
-                Challenge {activeChallengeIdx + 1} of {challenges.length}
-              </span>
-            </div>
-
-            {/* Challenge Type Selector Tabs */}
-            <div className="flex items-center gap-1 border-b border-zinc-100 pb-1.5">
-              {challenges.map((c, i) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setActiveChallengeIdx(i);
-                    setSelectedChallengeOption(null);
-                    setChallengeSubmitted(false);
-                  }}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors uppercase ${
-                    i === activeChallengeIdx
-                      ? "bg-brand-50 text-brand-700 border border-brand-200"
-                      : "text-zinc-500 hover:bg-zinc-100"
-                  }`}
-                >
-                  {c.challenge_type}
-                </button>
-              ))}
-            </div>
-
-            {/* Question */}
-            <div className="space-y-1">
-              <p className="text-zinc-900 font-medium text-xs leading-relaxed">
-                {activeChallenge.question}
-              </p>
-              {activeChallenge.code_context && (
-                <div className="bg-zinc-900 text-zinc-100 p-2 rounded font-mono text-[11px]">
-                  <pre>{activeChallenge.code_context}</pre>
-                </div>
-              )}
-            </div>
-
-            {/* Multiple Choice Options if present */}
-            {activeChallenge.options && activeChallenge.options.length > 0 ? (
-              <div className="space-y-1.5">
-                {activeChallenge.options.map((opt, optIdx) => {
-                  const isSelected = selectedChallengeOption === opt;
-                  return (
-                    <button
-                      key={optIdx}
-                      data-testid={`challenge-option-${optIdx}`}
-                      onClick={() =>
-                        !challengeSubmitted && setSelectedChallengeOption(opt)
-                      }
-                      disabled={challengeSubmitted}
-                      className={`w-full p-2.5 rounded border text-left text-xs transition-all ${
-                        challengeSubmitted && opt === activeChallenge.correct_answer
-                          ? "bg-emerald-50 border-emerald-300 text-emerald-950 font-medium"
-                          : challengeSubmitted &&
-                            isSelected &&
-                            opt !== activeChallenge.correct_answer
-                          ? "bg-rose-50 border-rose-300 text-rose-950"
-                          : isSelected
-                          ? "bg-brand-50 border-brand-300 text-brand-950 font-medium"
-                          : "bg-white border-zinc-200 hover:border-zinc-300 text-zinc-700"
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
+            {isVerifying ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                Testing in sandbox…
+              </>
             ) : (
-              /* Coding Exercise Textarea */
-              <div className="space-y-1.5">
-                <textarea
-                  data-testid="challenge-coding-input"
-                  value={codingAnswer}
-                  onChange={(e) => setCodingAnswer(e.target.value)}
-                  placeholder="Enter Python statement here..."
-                  className="w-full h-16 p-2 font-mono text-xs border border-zinc-200 rounded focus:border-brand-500 outline-none"
-                />
-              </div>
+              <>
+                <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                {result ? "Verify again" : "Verify suggested fix"}
+              </>
             )}
+          </button>
+          <button
+            type="button"
+            data-testid="apply-fix-button"
+            onClick={handleApply}
+            className="btn btn-secondary"
+            title="Copy the suggested code into the editor. Nothing runs until you press Run."
+          >
+            Apply to editor
+          </button>
+        </div>
 
-            {/* Challenge Controls & Feedback */}
-            <div className="pt-1">
-              {!challengeSubmitted ? (
-                <button
-                  data-testid="submit-challenge-button"
-                  onClick={() => setChallengeSubmitted(true)}
-                  disabled={
-                    activeChallenge.options
-                      ? !selectedChallengeOption
-                      : !codingAnswer.trim()
-                  }
-                  className="px-3 py-1 bg-brand-600 hover:bg-brand-700 disabled:bg-zinc-200 text-white disabled:text-zinc-400 font-medium rounded text-xs transition-colors"
-                >
-                  Check Answer
-                </button>
-              ) : (
-                <div
-                  data-testid="challenge-feedback-card"
-                  className={`p-3 rounded-lg border text-xs space-y-1 ${
-                    (activeChallenge.options
-                      ? selectedChallengeOption === activeChallenge.correct_answer
-                      : codingAnswer.trim() === activeChallenge.correct_answer.trim())
-                      ? "bg-emerald-50 border-emerald-200 text-emerald-950"
-                      : "bg-amber-50 border-amber-200 text-amber-950"
-                  }`}
-                >
-                  <p className="font-semibold">
-                    {(activeChallenge.options
-                      ? selectedChallengeOption === activeChallenge.correct_answer
-                      : codingAnswer.trim() === activeChallenge.correct_answer.trim())
-                      ? "✓ Correct!"
-                      : "Divergence from Expected Concept"}
-                  </p>
-                  <p className="text-[11px] leading-relaxed">
-                    {activeChallenge.explanation}
-                  </p>
-                  {activeChallengeIdx < challenges.length - 1 && (
-                    <button
-                      onClick={() => {
-                        setActiveChallengeIdx((prev) => prev + 1);
-                        setSelectedChallengeOption(null);
-                        setChallengeSubmitted(false);
-                      }}
-                      className="mt-1 text-[11px] underline font-medium text-brand-700 hover:text-brand-900 block"
-                    >
-                      Next Challenge →
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+        <p aria-live="polite" className="mt-2 text-xs text-text-secondary min-h-[16px]">
+          {applied ? "Applied to the editor. Press Run code to try it yourself." : ""}
+        </p>
+
+        {verifyError && (
+          <div role="alert" className="mt-2 rounded-lg border border-[#F3C9C9] bg-error-50 px-3 py-2 text-[13px] text-text-primary">
+            <span className="font-medium text-error">Verification failed: </span>
+            {verifyError}
           </div>
         )}
-      </div>
+      </section>
+
+      {/* 5. Sandbox verification result */}
+      {result && (
+        <section aria-label="Verification result" data-testid="fix-verification-result" className="fade-in">
+          <SectionHeading n={5} title="Verification">
+            <span className="chip chip-verified">
+              <ShieldCheck className="w-3 h-3" aria-hidden="true" />
+              Sandbox result
+            </span>
+          </SectionHeading>
+          <div
+            role="status"
+            className={`rounded-lg border px-3.5 py-3 ${
+              result.is_verified
+                ? "bg-success-50 border-[#bfe5d4]"
+                : "bg-error-50 border-[#F3C9C9]"
+            }`}
+          >
+            <div data-testid="sandbox-verified-banner" className="flex items-center gap-2 font-semibold text-[13.5px]">
+              {result.is_verified ? (
+                <CheckCircle2 className="w-4 h-4 text-success" aria-hidden="true" />
+              ) : (
+                <XCircle className="w-4 h-4 text-error" aria-hidden="true" />
+              )}
+              <span className={result.is_verified ? "text-success" : "text-error"}>
+                {result.is_verified
+                  ? "Correction Verified in Sandbox"
+                  : "Correction did not pass the sandbox check"}
+              </span>
+            </div>
+            <p className="mt-1.5 text-[13px] leading-5 text-text-primary">{result.verification_summary}</p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px]">
+              <span className="text-text-secondary">Output:</span>
+              <code className="font-mono text-[12.5px] bg-surface rounded px-1.5 py-0.5 border border-border break-all">
+                {result.verified_output || "(none)"}
+              </code>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-text-secondary">{result.disclaimer}</p>
+          </div>
+
+          {result.is_verified && onCompare && (
+            <button
+              type="button"
+              data-testid="compare-button"
+              onClick={onCompare}
+              className="btn btn-primary mt-4"
+            >
+              <GitCompare className="w-4 h-4" aria-hidden="true" />
+              Compare before and after
+            </button>
+          )}
+        </section>
+      )}
     </div>
   );
 };

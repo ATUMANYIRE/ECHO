@@ -77,8 +77,8 @@ export async function executeCode(request: ExecutionRequest): Promise<ExecutionR
   const url = `${baseUrl}/api/execution/run`;
 
   const controller = new AbortController();
-  // 10s client timeout to accommodate container creation & execution
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  // 30s client timeout to accommodate container creation & execution
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
     const response = await fetch(url, {
@@ -125,7 +125,7 @@ export async function analyzeInvestigation(request: InvestigationRequest): Promi
   const url = `${baseUrl}/api/investigation/analyze`;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
 
   try {
     const response = await fetch(url, {

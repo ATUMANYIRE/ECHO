@@ -20,6 +20,8 @@ MAX_CONTAINER_ITEMS = 30
 
 DELIMITER_START = "<<<ECHO_TRACE_START>>>"
 DELIMITER_END = "<<<ECHO_TRACE_END>>>"
+RUNNER_READY = "<<<ECHO_RUNNER_READY>>>"
+RUNNER_EXECUTING = "<<<ECHO_RUNNER_EXECUTING>>>"
 
 
 def safe_repr(val: Any) -> str:
@@ -163,6 +165,11 @@ class TraceCollector:
 
 
 def main():
+    # Docker startup is complete. The host starts the student-code deadline only
+    # after receiving this marker, before it sends code on stdin.
+    sys.__stdout__.write(f"{RUNNER_READY}\n")
+    sys.__stdout__.flush()
+
     # Read user code from stdin
     try:
         user_code = sys.stdin.read()
@@ -178,6 +185,11 @@ def main():
             "is_authoritative": True,
         })
         return
+
+    # Stdin delivery is complete. Everything after this point, including
+    # compilation, tracing, and result serialization, uses the code deadline.
+    sys.__stdout__.write(f"{RUNNER_EXECUTING}\n")
+    sys.__stdout__.flush()
 
     # Check for empty code
     if not user_code.strip():

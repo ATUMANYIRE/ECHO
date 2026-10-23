@@ -2,36 +2,219 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * ECHO design system — light-first, calm, restrained.
+ * Tokens: background #FAFAF8 · surface #FFFFFF · text #20252D · secondary #707782
+ *         border #E8E9E6 · accent #4F46E5 (hover #4338CA) · accent surface #EEF2FF
+ *         success #16805D · error #D34A4A
+ */
 :root {
-  --background: #FAFAF8;
-  --foreground: #18181B;
-  --surface: #FFFFFF;
-  --surface-border: #E4E4E7;
-  --brand-accent: #6366F1;
+  --background: #fafaf8;
+  --surface: #ffffff;
+  --text-primary: #20252d;
+  --text-secondary: #707782;
+  --border: #e8e9e6;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-surface: #eef2ff;
+  --success: #16805d;
+  --error: #d34a4a;
 }
 
 @layer base {
-  body {
-    background-color: var(--background);
-    color: var(--foreground);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
-  /* Compact scrollbars */
+  body {
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-size: 13.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  ::selection {
+    background: #c7d2fe;
+    color: #20252d;
+  }
+
+  /* Calm, thin scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #d9dad6 transparent;
+  }
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #D4D4D8;
-    border-radius: 3px;
+    background: #d9dad6;
+    border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #A1A1AA;
+    background: #b8bab5;
+  }
+}
+
+@layer components {
+  /* ---------- Buttons ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 h-10 text-[13px] font-medium
+      whitespace-nowrap select-none transition-colors duration-150
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-sm {
+    @apply h-8 px-3 text-xs rounded-md;
+  }
+  .btn-primary {
+    @apply bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800;
+  }
+  .btn-secondary {
+    @apply bg-surface text-text-primary border border-border hover:bg-surface-subtle hover:border-[#d9dad6];
+  }
+  .btn-ghost {
+    @apply text-text-secondary hover:bg-surface-muted hover:text-text-primary;
+  }
+  .btn-success {
+    @apply bg-success text-white hover:bg-success-700;
+  }
+
+  /* ---------- Surfaces ---------- */
+  .card {
+    @apply bg-surface border border-border rounded-xl;
+  }
+  .panel-title {
+    @apply text-[13px] font-semibold text-text-primary;
+  }
+  .eyebrow {
+    @apply text-xs font-medium text-text-secondary;
+  }
+
+  /* ---------- Status chips ---------- */
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium leading-5;
+  }
+  .chip-neutral {
+    @apply bg-surface-subtle text-text-secondary border-border;
+  }
+  .chip-verified {
+    @apply bg-success-50 text-success border-[#bfe5d4];
+  }
+  .chip-ai {
+    @apply bg-brand-50 text-brand-700 border-brand-200;
+  }
+  .chip-warn {
+    @apply bg-[#FFF8EB] text-[#9A5B00] border-[#F3DDB0];
+  }
+  .chip-error {
+    @apply bg-error-50 text-error border-[#F3C9C9];
+  }
+
+  /* ---------- Code ---------- */
+  .code-block {
+    @apply font-mono text-[12.5px] leading-6 bg-surface-subtle border border-border rounded-lg px-3 py-2.5 overflow-x-auto;
+  }
+}
+
+/* ---------- Editor typography (shared by highlight layer + textarea) ---------- */
+.editor-text {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14px;
+  line-height: 24px;
+  tab-size: 4;
+  letter-spacing: 0;
+}
+
+.editor-input::selection {
+  background: rgba(79, 70, 229, 0.2);
+  color: transparent;
+}
+
+.tok-keyword { color: #4f46e5; font-weight: 500; }
+.tok-string { color: #16805d; }
+.tok-number { color: #b45309; }
+.tok-comment { color: #9aa0a8; font-style: italic; }
+.tok-builtin { color: #0e7490; }
+.tok-def { color: #20252d; font-weight: 600; }
+.tok-deco { color: #7c6bd6; }
+
+/* ---------- Timeline scrubber ---------- */
+.scrubber {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+  --progress: 0%;
+}
+.scrubber::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--accent) var(--progress), #e6e7e3 var(--progress));
+}
+.scrubber::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #e6e7e3;
+}
+.scrubber::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: transform 120ms ease;
+}
+.scrubber::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--accent);
+}
+.scrubber:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+/* ---------- Motion (restrained) ---------- */
+@keyframes echo-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes echo-changed {
+  from { background-color: #dfe5ff; }
+  to { background-color: #eef2ff; }
+}
+.fade-in { animation: echo-fade-in 200ms ease-out both; }
+.var-changed { animation: echo-changed 700ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

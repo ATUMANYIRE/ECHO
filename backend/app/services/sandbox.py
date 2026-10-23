@@ -27,6 +27,8 @@ logger = logging.getLogger("echo.sandbox")
 
 DELIMITER_START = "<<<ECHO_TRACE_START>>>"
 DELIMITER_END = "<<<ECHO_TRACE_END>>>"
+RUNNER_READY = b"<<<ECHO_RUNNER_READY>>>"
+RUNNER_EXECUTING = b"<<<ECHO_RUNNER_EXECUTING>>>"
 
 
 class SandboxService:
@@ -39,6 +41,7 @@ class SandboxService:
         if not docker_bin:
             return False
 
+        proc = None
         try:
             # Check daemon response
             proc = await asyncio.create_subprocess_exec(
@@ -54,6 +57,13 @@ class SandboxService:
         except Exception as e:
             logger.warning("Sandbox availability check failed: %s", e)
             return False
+        finally:
+            if proc is not None and proc.returncode is None:
+                try:
+                    proc.kill()
+                    await asyncio.wait_for(proc.wait(), timeout=2.0)
+                except (ProcessLookupError, asyncio.TimeoutError):
+                    logger.warning("Docker image inspection process did not exit cleanly")
 
     async def execute_code(self, code: str) -> ExecutionResponse:
         """Run student code inside a disposable isolated container."""
@@ -108,10 +118,9 @@ class SandboxService:
             settings.runner_image,
         ]
 
-        start_time = time.perf_counter()
-
         async with self.semaphore:
             proc = None
+            startup_started = time.perf_counter()
             try:
                 proc = await asyncio.create_subprocess_exec(
                     *docker_args,
@@ -120,36 +129,96 @@ class SandboxService:
                     stderr=asyncio.subprocess.PIPE,
                 )
 
-                code_bytes = code.encode("utf-8")
+                assert proc.stdout is not None and proc.stdin is not None and proc.stderr is not None
+                startup_deadline = startup_started + settings.sandbox_startup_timeout_seconds
+                try:
+                    ready_line = await asyncio.wait_for(
+                        proc.stdout.readline(),
+                        timeout=max(0.001, startup_deadline - time.perf_counter()),
+                    )
+                    if ready_line.strip() != RUNNER_READY:
+                        stderr_bytes = await proc.stderr.read() if proc.returncode is not None else b""
+                        logger.error(
+                            "Runner did not become ready: container=%s stdout=%r stderr=%r",
+                            container_name, ready_line[:200], stderr_bytes[:500],
+                        )
+                        return ExecutionResponse(
+                            status=ExecutionStatus.SANDBOX_UNAVAILABLE,
+                            error_message="Docker runner exited before it was ready. Check backend logs and runner image.",
+                            termination_reason="sandbox_startup_failed",
+                            is_authoritative=False,
+                        )
+
+                    proc.stdin.write(code.encode("utf-8"))
+                    await asyncio.wait_for(
+                        proc.stdin.drain(),
+                        timeout=max(0.001, startup_deadline - time.perf_counter()),
+                    )
+                    proc.stdin.close()
+                    executing_line = await asyncio.wait_for(
+                        proc.stdout.readline(),
+                        timeout=max(0.001, startup_deadline - time.perf_counter()),
+                    )
+                    if executing_line.strip() != RUNNER_EXECUTING:
+                        logger.error(
+                            "Runner did not accept code: container=%s stdout=%r",
+                            container_name, executing_line[:200],
+                        )
+                        return ExecutionResponse(
+                            status=ExecutionStatus.SANDBOX_UNAVAILABLE,
+                            error_message="Docker runner did not accept the program. Check backend logs and runner image.",
+                            termination_reason="sandbox_protocol_error",
+                            is_authoritative=False,
+                        )
+                except asyncio.TimeoutError:
+                    logger.error("Docker runner startup timed out: container=%s", container_name)
+                    await self._force_kill_container(docker_bin, container_name)
+                    return ExecutionResponse(
+                        status=ExecutionStatus.SANDBOX_UNAVAILABLE,
+                        duration_ms=round((time.perf_counter() - startup_started) * 1000, 2),
+                        error_message="Docker runner did not start in time. Student code was not timed out.",
+                        termination_reason="sandbox_startup_timeout",
+                        is_authoritative=False,
+                    )
+
+                startup_ms = (time.perf_counter() - startup_started) * 1000
+                execution_started = time.perf_counter()
+                logger.info("Docker runner ready: container=%s startup_ms=%.2f", container_name, startup_ms)
                 try:
                     stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                        proc.communicate(input=code_bytes),
+                        proc.communicate(),
                         timeout=settings.execution_timeout_seconds,
                     )
                 except asyncio.TimeoutError:
-                    # Enforce hard kill on timeout
-                    logger.warning("Execution timed out for container %s", container_name)
+                    logger.warning(
+                        "Runner execution deadline reached: container=%s startup_ms=%.2f execution_ms=%.2f",
+                        container_name, startup_ms, (time.perf_counter() - execution_started) * 1000,
+                    )
                     await self._force_kill_container(docker_bin, container_name)
                     return ExecutionResponse(
                         status=ExecutionStatus.TIMEOUT,
-                        duration_ms=round(settings.execution_timeout_seconds * 1000, 2),
+                        duration_ms=round((time.perf_counter() - execution_started) * 1000, 2),
                         error_message=(
-                            f"Execution timed out after {settings.execution_timeout_seconds}s limit. "
-                            "Check for infinite loops or excessive recursion."
+                            f"Program execution timed out after the {settings.execution_timeout_seconds}s limit "
+                            "after the Docker runner started."
                         ),
-                        termination_reason="timeout",
+                        termination_reason="execution_timeout",
                         is_authoritative=True,
                     )
 
-                duration_ms = (time.perf_counter() - start_time) * 1000
+                execution_ms = (time.perf_counter() - execution_started) * 1000
                 stdout_str = stdout_bytes.decode("utf-8", errors="replace")
                 stderr_str = stderr_bytes.decode("utf-8", errors="replace")
+                logger.info(
+                    "Docker runner finished: container=%s startup_ms=%.2f execution_ms=%.2f parse_bytes=%d exit_code=%s",
+                    container_name, startup_ms, execution_ms, len(stdout_bytes), proc.returncode,
+                )
 
                 # Handle OOM or abnormal container death (exit code 137)
                 if proc.returncode == 137:
                     return ExecutionResponse(
                         status=ExecutionStatus.OOM_KILLED,
-                        duration_ms=round(duration_ms, 2),
+                        duration_ms=round(execution_ms, 2),
                         error_message=(
                             f"Container killed: memory limit ({settings.execution_max_memory_mb} MB) exceeded."
                         ),
@@ -158,17 +227,32 @@ class SandboxService:
                     )
 
                 # Parse delimited JSON output from trace runner
-                return self._parse_runner_output(stdout_str, stderr_str, duration_ms)
+                parse_started = time.perf_counter()
+                response = self._parse_runner_output(stdout_str, stderr_str, execution_ms)
+                logger.info(
+                    "Docker trace parsed: container=%s parse_ms=%.2f steps=%d status=%s",
+                    container_name, (time.perf_counter() - parse_started) * 1000,
+                    response.total_steps, response.status.value,
+                )
+                return response
 
             except Exception as e:
-                logger.error("Unexpected error executing code in sandbox: %s", e)
+                logger.exception("Sandbox infrastructure error: container=%s", container_name)
                 return ExecutionResponse(
-                    status=ExecutionStatus.ERROR,
-                    error_message=f"Sandbox execution failed: {str(e)}",
-                    termination_reason="internal_error",
-                    is_authoritative=True,
+                    status=ExecutionStatus.SANDBOX_UNAVAILABLE,
+                    error_message=f"Sandbox infrastructure failed: {str(e)}",
+                    termination_reason="sandbox_internal_error",
+                    is_authoritative=False,
                 )
             finally:
+                if proc is not None and proc.returncode is None:
+                    try:
+                        proc.kill()
+                        await asyncio.wait_for(proc.wait(), timeout=2.0)
+                    except ProcessLookupError:
+                        pass
+                    except asyncio.TimeoutError:
+                        logger.warning("Docker CLI did not exit after kill: container=%s", container_name)
                 # Guarantee container cleanup to prevent orphaned containers
                 await self._cleanup_container(docker_bin, container_name)
 

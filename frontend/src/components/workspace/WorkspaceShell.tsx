@@ -1,100 +1,65 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Play, Loader2, Sparkles, ArrowRight, AlertTriangle } from "lucide-react";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { CodeEditorPane } from "./CodeEditorPane";
 import { ExpectedBehaviorPane } from "./ExpectedBehaviorPane";
-import { ControlBar } from "./ControlBar";
-import { ExecutionTimelinePane, TimelineTab } from "./ExecutionTimelinePane";
+import { JourneyStepper, Stage } from "./JourneyStepper";
+import { RunEmptyState } from "./RunEmptyState";
+import { ResultSummary } from "./ResultSummary";
+import { ReplayPanel } from "./ReplayPanel";
+import { InvestigationPane } from "./InvestigationPane";
+import { ComparisonView } from "./ComparisonView";
+import { LearnPanel } from "./LearnPanel";
 import { getBackendHealth, executeCode, analyzeInvestigation } from "@/lib/api-client";
 import {
   HealthResponse,
   ExecutionResponse,
   ExecutionRunRecord,
   InvestigationResponse,
+  FixVerificationResponse,
 } from "@/lib/types";
-import { SAMPLE_TRACE } from "@/lib/sample-data";
+import { EXAMPLES, DEFAULT_EXAMPLE } from "@/lib/examples";
 
-// 3 Distinct Educational Benchmark Programs
-const PROGRAM_ACCUMULATOR_BUG = `scores = [60, 80, 100]
-total = 0
-for score in scores:
-    total = score
-average = total / len(scores)
-print(average)`;
+type View = "empty" | "summary" | "replay" | "explain" | "compare" | "learn";
 
-const PROGRAM_OFF_BY_ONE = `items = ["alpha", "beta", "gamma"]
-# Bug: range(len + 1) indexes past list bounds
-for i in range(len(items) + 1):
-    print(f"Item {i}: {items[i]}")`;
-
-const PROGRAM_RECURSIVE_FACTORIAL = `def factorial(n):
-    if n <= 1:
-        return 1
-    return n * factorial(n - 1)
-
-result = factorial(4)
-print(f"4! = {result}")`;
+function errorFromExecution(exec: ExecutionResponse | null): { line: number | null; summary: string | null } {
+  if (!exec) return { line: null, summary: null };
+  const exc = exec.steps.find((s) => s.event_type === "exception");
+  const line = exec.error_line ?? exc?.line_number ?? null;
+  const summary = exec.error_type ?? exc?.exception?.split(":")[0] ?? null;
+  return { line, summary: line ? summary : null };
+}
 
 export const WorkspaceShell: React.FC = () => {
-  // Backend connectivity state
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [isLoadingHealth, setIsLoadingHealth] = useState<boolean>(true);
+  const [isLoadingHealth, setIsLoadingHealth] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
 
-  // Editor and Intent state
-  const [code, setCode] = useState<string>(PROGRAM_ACCUMULATOR_BUG);
-  const [expectedBehavior, setExpectedBehavior] = useState<string>(
-    "Iterate through scores [60, 80, 100], sum all values, and calculate average: 80.0"
-  );
+  const [code, setCode] = useState(DEFAULT_EXAMPLE.code);
+  const [expectedBehavior, setExpectedBehavior] = useState(DEFAULT_EXAMPLE.expected);
+  const [exampleId, setExampleId] = useState(DEFAULT_EXAMPLE.id);
 
-  // Execution state
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [realExecution, setRealExecution] = useState<ExecutionResponse | null>(null);
-  const [isSampleMode, setIsSampleMode] = useState<boolean>(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [execution, setExecution] = useState<ExecutionResponse | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [view, setView] = useState<View>("empty");
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
 
-  // Run History Comparison state (Before and After)
-  const [runA, setRunA] = useState<ExecutionRunRecord | null>(null);
-  const [runB, setRunB] = useState<ExecutionRunRecord | null>(null);
+  // "Before" is the earlier run, "After" the most recent one.
+  const [before, setBefore] = useState<ExecutionRunRecord | null>(null);
+  const [after, setAfter] = useState<ExecutionRunRecord | null>(null);
 
-  // Timeline scrubber state
-  const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
-
-  // AI Investigation state (Milestone 4)
   const [investigation, setInvestigation] = useState<InvestigationResponse | null>(null);
-  const [isInvestigating, setIsInvestigating] = useState<boolean>(false);
-  const [activeTimelineTab, setActiveTimelineTab] = useState<TimelineTab>("timeline");
+  const [isInvestigating, setIsInvestigating] = useState(false);
+  const [investigationError, setInvestigationError] = useState<string | null>(null);
+  const [verification, setVerification] = useState<FixVerificationResponse | null>(null);
 
-  const handleInvestigate = async () => {
-    if (!realExecution || isInvestigating) return;
-
-    try {
-      setIsInvestigating(true);
-      setActiveTimelineTab("investigate");
-      const res = await analyzeInvestigation({
-        code,
-        expected_behavior: expectedBehavior,
-        execution: realExecution,
-        comparison_execution: runB?.response || null,
-      });
-      setInvestigation(res);
-    } catch (err) {
-      console.error("AI Investigation failed:", err);
-    } finally {
-      setIsInvestigating(false);
-    }
-  };
-
-  const handleApplySuggestedFix = (newCode: string) => {
-    setCode(newCode);
-  };
-
-  // Check health on mount
   const checkHealth = useCallback(async () => {
     try {
       setIsLoadingHealth(true);
-      const data = await getBackendHealth();
-      setHealth(data);
+      setHealth(await getBackendHealth());
       setHealthError(null);
     } catch (err: unknown) {
       setHealth(null);
@@ -110,247 +75,306 @@ export const WorkspaceShell: React.FC = () => {
     return () => clearInterval(interval);
   }, [checkHealth]);
 
-  // Execute Code in secure sandbox
-  const handleRunCode = async () => {
+  const resetResults = () => {
+    setExecution(null);
+    setView("empty");
+    setActiveStepIndex(0);
+    setBefore(null);
+    setAfter(null);
+    setInvestigation(null);
+    setInvestigationError(null);
+    setVerification(null);
+    setRunError(null);
+  };
+
+  const loadExample = (id: string) => {
+    const example = EXAMPLES.find((e) => e.id === id);
+    if (!example) return;
+    setCode(example.code);
+    setExpectedBehavior(example.expected);
+    setExampleId(example.id);
+    resetResults();
+  };
+
+  const handleCodeChange = (next: string) => {
+    setCode(next);
+    const match = EXAMPLES.find((e) => e.code === next);
+    setExampleId(match ? match.id : "custom");
+  };
+
+  const handleRun = async () => {
     if (!code.trim() || isRunning) return;
-
+    setIsRunning(true);
+    setRunError(null);
     try {
-      setIsRunning(true);
-      const result = await executeCode({
-        code,
-        expected_behavior: expectedBehavior,
-      });
-
-      setRealExecution(result);
-      setIsSampleMode(false);
-      setActiveStepIndex(0);
-
-      // Track into Run A or Run B comparison history
+      const result = await executeCode({ code, expected_behavior: expectedBehavior });
       const record: ExecutionRunRecord = {
         id: result.execution_id,
-        label: runA ? "Run B (Modified)" : "Run A (Initial)",
+        label: "",
         code,
         response: result,
         timestamp: new Date().toLocaleTimeString(),
       };
-
-      if (!runA) {
-        setRunA(record);
-      } else {
-        setRunB(record);
-      }
-    } catch (err: unknown) {
-      setRealExecution({
-        execution_id: "err-fallback",
-        status: "error",
-        total_steps: 0,
-        duration_ms: 0,
-        stdout: "",
-        stderr: err instanceof Error ? err.message : "Execution failed",
-        steps: [],
-        error_message: err instanceof Error ? err.message : "Execution failed",
-        is_authoritative: false,
-        executed_at: new Date().toISOString(),
-      });
-      setIsSampleMode(false);
+      setBefore(after);
+      setAfter(record);
+      setExecution(result);
       setActiveStepIndex(0);
+      setView("summary");
+    } catch (err: unknown) {
+      // A failed request is not a program result: never present it as an execution.
+      setRunError(err instanceof Error ? err.message : "Execution failed");
     } finally {
       setIsRunning(false);
     }
   };
 
-  // Derive active steps list
-  const activeSteps = isSampleMode
-    ? SAMPLE_TRACE.steps
-    : realExecution?.steps || [];
-
-  const activeStep = activeSteps[activeStepIndex];
-  const activeLine = activeStep ? activeStep.line_number : null;
-
-  // Locate line of exception or syntax error
-  let errorLine: number | null = null;
-  if (!isSampleMode && realExecution) {
-    if (realExecution.error_line) {
-      errorLine = realExecution.error_line;
-    } else {
-      const excStep = realExecution.steps.find((s) => s.event_type === "exception");
-      if (excStep) errorLine = excStep.line_number;
+  const handleInvestigate = async () => {
+    if (!execution || isInvestigating) return;
+    setView("explain");
+    setIsInvestigating(true);
+    setInvestigationError(null);
+    try {
+      const res = await analyzeInvestigation({
+        code,
+        expected_behavior: expectedBehavior,
+        execution,
+        comparison_execution: before && before.response !== execution ? before.response : null,
+      });
+      setInvestigation(res);
+    } catch (err) {
+      setInvestigationError(err instanceof Error ? err.message : "Gemini could not be reached.");
+    } finally {
+      setIsInvestigating(false);
     }
-  } else if (isSampleMode) {
-    const excStep = SAMPLE_TRACE.steps.find((s) => s.event_type === "exception");
-    if (excStep) errorLine = excStep.line_number;
-  }
-
-  // Presets
-  const handleLoadAccumulatorBug = () => {
-    setCode(PROGRAM_ACCUMULATOR_BUG);
-    setExpectedBehavior("Iterate through scores [60, 80, 100], sum all values, and calculate average: 80.0");
-    setRealExecution(null);
-    setIsSampleMode(false);
-    setActiveStepIndex(0);
   };
 
-  const handleApplyFix = () => {
-    const fixedCode = code.replace("total = score", "total += score");
-    setCode(fixedCode);
+  const handleVerified = (result: FixVerificationResponse) => setVerification(result);
+
+  // Compare the run the student started from with the verified correction.
+  const handleCompareVerification = () => {
+    if (!verification || !investigation || !execution) return;
+    setBefore({
+      id: execution.execution_id,
+      label: "",
+      code,
+      response: execution,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+    setAfter({
+      id: verification.execution.execution_id,
+      label: "",
+      code: investigation.suggested_correction,
+      response: verification.execution,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+    setView("compare");
   };
 
-  const handleLoadOffByOne = () => {
-    setCode(PROGRAM_OFF_BY_ONE);
-    setExpectedBehavior("Iterate through items ['alpha', 'beta', 'gamma'] and print item 0, 1, 2 without IndexError.");
-    setRealExecution(null);
-    setIsSampleMode(false);
-    setActiveStepIndex(0);
-  };
-
-  const handleLoadRecursion = () => {
-    setCode(PROGRAM_RECURSIVE_FACTORIAL);
-    setExpectedBehavior("Recursively compute factorial of 4, returning 24.");
-    setRealExecution(null);
-    setIsSampleMode(false);
-    setActiveStepIndex(0);
-  };
-
-  const handleSelectRun = (record: ExecutionRunRecord) => {
+  const openRun = (record: ExecutionRunRecord) => {
     setCode(record.code);
-    setRealExecution(record.response);
-    setIsSampleMode(false);
+    setExecution(record.response);
     setActiveStepIndex(0);
+    setView("replay");
   };
+
+  const { line: errorLine, summary: errorSummary } = useMemo(() => errorFromExecution(execution), [execution]);
+  const activeStep = execution?.steps[activeStepIndex];
+  const activeLine = view === "replay" && activeStep ? activeStep.line_number : null;
+
+  const hasInvestigation = !!investigation;
+  const isVerified = !!verification?.is_verified;
+  const canCompare = !!(before && after && before.id !== after.id);
+
+  const stage: Stage = {
+    empty: isRunning ? "run" : "write",
+    summary: "run",
+    replay: "explore",
+    explain: isVerified ? "fix" : "understand",
+    compare: "fix",
+    learn: "learn",
+  }[view] as Stage;
+
+  const reached: Record<Stage, boolean> = {
+    write: true,
+    run: !!execution,
+    explore: !!execution,
+    understand: hasInvestigation,
+    fix: hasInvestigation,
+    learn: hasInvestigation,
+  };
+
+  const navigate = (target: Stage) => {
+    if (target === "write") {
+      document.querySelector<HTMLTextAreaElement>("[data-testid='code-editor-textarea']")?.focus();
+      return;
+    }
+    const map: Record<Exclude<Stage, "write">, View> = {
+      run: "summary",
+      explore: "replay",
+      understand: "explain",
+      fix: "explain",
+      learn: "learn",
+    };
+    setView(map[target]);
+  };
+
+  const nextHint = !execution
+    ? "Run your code to record it."
+    : view === "summary"
+    ? "Step through the recording to see where it went wrong."
+    : view === "replay" && !hasInvestigation
+    ? "Ask Gemini to explain what happened."
+    : hasInvestigation && !isVerified
+    ? "Check the suggested fix before you apply it."
+    : isVerified && view !== "learn"
+    ? "Fix confirmed. Test your understanding."
+    : "";
 
   return (
-    <div className="flex flex-col h-screen w-full bg-canvas-50 text-zinc-900 select-none">
-      {/* Top Navigation & Status Bar */}
-      <WorkspaceHeader
-        health={health}
-        isLoadingHealth={isLoadingHealth}
-        healthError={healthError}
-      />
+    <div className="flex flex-col min-h-screen lg:h-screen w-full bg-background text-text-primary">
+      <WorkspaceHeader health={health} isLoadingHealth={isLoadingHealth} healthError={healthError}>
+        <JourneyStepper current={stage} reached={reached} onNavigate={navigate} />
+      </WorkspaceHeader>
 
-      {/* Main Debugging Workbench (Desktop Split Grid) */}
-      <main className="flex-1 p-3 lg:p-4 overflow-y-auto lg:overflow-hidden">
-        <div className="h-full max-w-[1680px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-          {/* Left Column: Code Editor & Expected Behavior (7 cols) */}
-          <div className="lg:col-span-7 flex flex-col gap-3 h-full">
-            <div className="flex-1 min-h-[360px] lg:min-h-0">
+      <main className="flex-1 min-h-0 p-3 lg:p-4">
+        <div className="h-full max-w-[1680px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-3 lg:gap-4">
+          {/* Left: write */}
+          <section aria-label="Your code" className="card flex flex-col min-h-0 overflow-hidden">
+            <div className="h-[340px] lg:h-auto lg:flex-1 min-h-0">
               <CodeEditorPane
+                bare
                 code={code}
-                onChange={setCode}
+                onChange={handleCodeChange}
                 activeLine={activeLine}
                 errorLine={errorLine}
-                onResetToSample={handleLoadAccumulatorBug}
+                errorSummary={errorSummary}
+                onResetToSample={() => loadExample(exampleId === "custom" ? DEFAULT_EXAMPLE.id : exampleId)}
+                exampleId={exampleId}
+                onSelectExample={loadExample}
+                onRun={handleRun}
               />
             </div>
+            <ExpectedBehaviorPane bare value={expectedBehavior} onChange={setExpectedBehavior} />
+            <div className="px-4 py-3 border-t border-border bg-surface-subtle">
+              <button
+                type="button"
+                data-testid="run-code-button"
+                onClick={handleRun}
+                disabled={isRunning || !code.trim()}
+                className="btn btn-primary h-11 w-full"
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Running in sandbox…
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" aria-hidden="true" /> {execution ? "Run again" : "Run code"}
+                    <span className="hidden sm:inline text-[11px] font-normal text-white/70 ml-1">Ctrl + Enter</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </section>
 
-            {/* Quick Benchmark Presets Bar */}
-            <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 px-1 text-[11px]">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-zinc-400 font-medium">Benchmarks:</span>
-                <select
-                  data-testid="preset-benchmark-select"
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "accumulator") handleLoadAccumulatorBug();
-                    else if (val === "off_by_one") handleLoadOffByOne();
-                    else if (val === "recursion") handleLoadRecursion();
-                  }}
-                  className="px-2 py-0.5 text-xs rounded border border-zinc-200 bg-white text-zinc-700 outline-none cursor-pointer"
-                  aria-label="Benchmark preset selector"
-                >
-                  <option value="accumulator">Accumulator Bug</option>
-                  <option value="off_by_one">Off-By-One Bug</option>
-                  <option value="recursion">Recursion Frame</option>
-                </select>
-                <button
-                  onClick={handleApplyFix}
-                  className="px-2 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors font-medium"
-                  title="Apply fix: total += score"
-                >
-                  Apply Fix (+=)
-                </button>
-              </div>
-
-              {/* Tag as Run A or Run B */}
-              {realExecution && (
-                <div className="flex items-center gap-1 text-[10px]">
-                  <button
-                    onClick={() =>
-                      setRunA({
-                        id: realExecution.execution_id,
-                        label: "Run A (Baseline)",
-                        code,
-                        response: realExecution,
-                        timestamp: new Date().toLocaleTimeString(),
-                      })
-                    }
-                    className="px-1.5 py-0.5 rounded border border-zinc-300 text-zinc-600 hover:bg-zinc-100"
-                    title="Pin current execution as Run A"
-                  >
-                    Set as Run A
-                  </button>
-                  <button
-                    onClick={() =>
-                      setRunB({
-                        id: realExecution.execution_id,
-                        label: "Run B (Comparison)",
-                        code,
-                        response: realExecution,
-                        timestamp: new Date().toLocaleTimeString(),
-                      })
-                    }
-                    className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-medium"
-                    title="Pin current execution as Run B"
-                  >
-                    Set as Run B
+          {/* Right: investigate */}
+          <section
+            aria-label="Debugging workspace"
+            className="card flex flex-col min-h-[420px] lg:min-h-0 overflow-hidden"
+          >
+            {nextHint && (
+              <p
+                data-testid="next-step-hint"
+                className="flex-shrink-0 flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-brand-50 border-b border-brand-100 text-[13px] text-brand-800"
+              >
+                <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 text-brand-600" aria-hidden="true" />
+                <span className="font-medium">Next:</span>
+                <span className="min-w-0">{nextHint}</span>
+              </p>
+            )}
+            <div className="flex-1 min-h-0 overflow-y-auto" data-testid="workspace-panel">
+              {isRunning && (!execution || view === "empty") ? (
+                <div role="status" className="px-6 py-16 text-center">
+                  <Loader2 className="w-6 h-6 mx-auto text-brand-600 animate-spin" aria-hidden="true" />
+                  <p className="mt-3 text-[13px] text-text-secondary">Running your code in an isolated container…</p>
+                </div>
+              ) : runError ? (
+                <div data-testid="run-error-state" role="alert" className="px-6 py-16 max-w-[460px] mx-auto text-center">
+                  <AlertTriangle className="w-6 h-6 mx-auto text-error" aria-hidden="true" />
+                  <h2 className="mt-4 text-[15px] font-semibold text-text-primary">Your code couldn&apos;t be run</h2>
+                  <p className="mt-1.5 text-[13px] leading-5 text-text-secondary break-words">
+                    {runError} Nothing was executed, so there is no recording to replay.
+                  </p>
+                  <button type="button" onClick={handleRun} className="btn btn-secondary mt-5">
+                    Try again
                   </button>
                 </div>
+              ) : view === "empty" || !execution ? (
+                <RunEmptyState onSelectExample={loadExample} currentExampleId={exampleId} />
+              ) : view === "summary" ? (
+                <ResultSummary
+                  execution={execution}
+                  expectedBehavior={expectedBehavior}
+                  onExplore={() => setView("replay")}
+                  onExplain={hasInvestigation ? () => setView("explain") : handleInvestigate}
+                  isInvestigating={isInvestigating}
+                  hasInvestigation={hasInvestigation}
+                  canComparePrevious={canCompare}
+                  onComparePrevious={() => setView("compare")}
+                />
+              ) : view === "replay" ? (
+                <ReplayPanel
+                  execution={execution}
+                  code={code}
+                  activeStepIndex={activeStepIndex}
+                  onSelectStep={setActiveStepIndex}
+                  onExplain={hasInvestigation ? () => setView("explain") : handleInvestigate}
+                  isInvestigating={isInvestigating}
+                  hasInvestigation={hasInvestigation}
+                />
+              ) : view === "explain" ? (
+                <>
+                  <InvestigationPane
+                    investigation={investigation}
+                    isLoading={isInvestigating}
+                    error={investigationError}
+                    onRetry={handleInvestigate}
+                    onSelectStep={(i) => {
+                      setActiveStepIndex(i);
+                      setView("replay");
+                    }}
+                    onApplyFix={setCode}
+                    originalCode={code}
+                    steps={execution.steps}
+                    verification={verification}
+                    onVerified={handleVerified}
+                    onCompare={handleCompareVerification}
+                  />
+                  {isVerified && (
+                    <div className="px-4 sm:px-5 pb-5">
+                      <button
+                        type="button"
+                        data-testid="go-to-learn-button"
+                        onClick={() => setView("learn")}
+                        className="btn btn-secondary w-full"
+                      >
+                        <Sparkles className="w-4 h-4 text-brand-600" aria-hidden="true" />
+                        Test what you learned
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : view === "compare" ? (
+                <ComparisonView runA={before} runB={after} onSelectRun={openRun} />
+              ) : (
+                <LearnPanel
+                  challenges={investigation?.learning_challenges ?? []}
+                  isVerified={isVerified}
+                  onBackToReplay={() => setView("replay")}
+                />
               )}
             </div>
-
-            <div className="flex-shrink-0">
-              <ExpectedBehaviorPane
-                value={expectedBehavior}
-                onChange={setExpectedBehavior}
-                onResetToSample={handleLoadAccumulatorBug}
-              />
-            </div>
-          </div>
-
-          {/* Right Column: Action Controls & Execution Timeline (5 cols) */}
-          <div className="lg:col-span-5 flex flex-col gap-3 h-full">
-            <div className="flex-shrink-0">
-              <ControlBar
-                onRun={handleRunCode}
-                isRunning={isRunning}
-                canRun={code.trim().length > 0}
-                executionStatus={realExecution?.status}
-                onInvestigate={handleInvestigate}
-                isInvestigating={isInvestigating}
-                canInvestigate={!!realExecution}
-              />
-            </div>
-
-            <div className="flex-1 min-h-[420px] lg:min-h-0">
-              <ExecutionTimelinePane
-                realExecution={realExecution}
-                sampleTrace={SAMPLE_TRACE}
-                isSampleMode={isSampleMode}
-                isLoading={isRunning}
-                activeStepIndex={activeStepIndex}
-                onSelectStep={setActiveStepIndex}
-                onSwitchToReal={() => setIsSampleMode(false)}
-                runA={runA}
-                runB={runB}
-                onSelectRun={handleSelectRun}
-                investigation={investigation}
-                isInvestigating={isInvestigating}
-                onApplyFix={handleApplySuggestedFix}
-                originalCode={code}
-                activeTab={activeTimelineTab}
-                onChangeTab={setActiveTimelineTab}
-              />
-            </div>
-          </div>
+          </section>
         </div>
       </main>
     </div>

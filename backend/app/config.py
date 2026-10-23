@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # Execution Sandbox Settings (Milestone 2)
     runner_image: str = Field(default="echo-runner:latest", alias="RUNNER_IMAGE")
     execution_timeout_seconds: float = Field(default=8.0, alias="EXECUTION_TIMEOUT_SECONDS")
+    sandbox_startup_timeout_seconds: float = Field(default=20.0, alias="SANDBOX_STARTUP_TIMEOUT_SECONDS")
     execution_max_memory_mb: int = Field(default=128, alias="EXECUTION_MAX_MEMORY_MB")
     execution_max_steps: int = Field(default=500, alias="EXECUTION_MAX_STEPS")
     max_concurrent_executions: int = Field(default=5, alias="MAX_CONCURRENT_EXECUTIONS")

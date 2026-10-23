@@ -122,11 +122,11 @@ export function compareExecutions(
 
   let explanation = "Executions produced identical outcomes.";
   if (!statusMatch) {
-    explanation = `Status differs: Run A (${runA.label}) exited with ${runA.response.status}, while Run B (${runB.label}) exited with ${runB.response.status}.`;
+    explanation = `Status differs: the Before run exited with ${runA.response.status}, while the After run exited with ${runB.response.status}.`;
   } else if (!stdoutMatch) {
-    explanation = `Output differs: Run A produced ${JSON.stringify(
+    explanation = `Output differs: Before, the program printed ${JSON.stringify(
       runA.response.stdout.trim()
-    )}, while Run B produced ${JSON.stringify(runB.response.stdout.trim())}.`;
+    )}, while after, it printed ${JSON.stringify(runB.response.stdout.trim())}.`;
   } else if (variableDiffs.some((d) => d.isDifferent)) {
     explanation = "Internal variable trajectories diverged despite identical final output.";
   }

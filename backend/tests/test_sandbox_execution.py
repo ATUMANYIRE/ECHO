@@ -57,6 +57,51 @@ async def test_acceptance_program_with_bug(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_average_example_deadline_starts_after_docker_startup(
+    async_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    """The real Docker trace must finish even when startup exceeds the code budget."""
+    code = (
+        "scores = [60, 80, 100]\n"
+        "total = 0\n"
+        "for score in scores:\n"
+        "    total = score\n"
+        "average = total / len(scores)\n"
+        "print(average)"
+    )
+    monkeypatch.setattr(settings, "execution_timeout_seconds", 1.0)
+
+    response = await async_client.post("/api/execution/run", json={"code": code})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["stdout"].strip() == "33.333333333333336"
+    assert data["is_authoritative"] is True
+    assert data["total_steps"] == len(data["steps"]) > 0
+    assert data["steps"][0]["line_number"] == 1
+
+
+@pytest.mark.asyncio
+async def test_docker_startup_timeout_is_not_reported_as_program_timeout(
+    async_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    """A stalled real Docker launch is an infrastructure failure, not a code loop."""
+    monkeypatch.setattr(settings, "sandbox_startup_timeout_seconds", 0.001)
+
+    response = await async_client.post(
+        "/api/execution/run", json={"code": "print('runner never started')"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "sandbox_unavailable"
+    assert data["termination_reason"] == "sandbox_startup_timeout"
+    assert data["is_authoritative"] is False
+    assert data["total_steps"] == 0
+
+
+@pytest.mark.asyncio
 async def test_acceptance_program_corrected(async_client: AsyncClient):
     """Verify corrected acceptance program using total += score produces 80.0."""
     code = (
@@ -196,8 +241,10 @@ async def test_infinite_loop_timeout(async_client: AsyncClient):
     data = response.json()
     assert data["status"] == "timeout"
     assert "timed out" in data["error_message"].lower()
-    # Must terminate reasonably close to configured timeout
-    assert elapsed <= settings.execution_timeout_seconds + 3.0
+    # Docker startup and teardown are separate from the student-code deadline.
+    assert elapsed <= (
+        settings.sandbox_startup_timeout_seconds + settings.execution_timeout_seconds + 4.0
+    )
 
 
 @pytest.mark.asyncio
